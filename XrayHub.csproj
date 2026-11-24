@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>XrayHub</AssemblyName>
+    <ApplicationIcon>Assets\XrayHub.ico</ApplicationIcon>
+    <RootNamespace>XrayHub</RootNamespace>
+    <Version>0.3.15</Version>
+    <Product>XrayHub</Product>
+    <Description>Windows proxy and tunnel client built around Xray Core.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets\XrayHub.ico" />
+    <Resource Include="Assets\XrayHub.png" />
+    <Resource Include="Assets\Flags\*.png" />
+    <Content Include="core\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
