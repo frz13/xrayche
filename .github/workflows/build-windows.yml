@@ -1,0 +1,178 @@
+name: Build XrayHub (Windows x64)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xrayhub-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and package XrayHub
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Verify project files
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $required = @(
+            'XrayHub.csproj',
+            'App.xaml',
+            'MainWindow.xaml',
+            'MainWindow.xaml.cs',
+            'app.manifest',
+            'Assets\XrayHub.ico',
+            'Assets\XrayHub.png'
+          )
+          foreach ($file in $required) {
+            if (-not (Test-Path -LiteralPath $file)) {
+              throw "Required project file is missing: $file"
+            }
+          }
+          Write-Host 'Project structure looks correct.'
+
+      - name: Install .NET 10 SDK on build runner
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download and verify Xray Core
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          # Pin the Xray Core version and verify the archive before extraction.
+          $version = '26.11.9'
+          $url = "https://github.com/XTLS/Xray-core/releases/download/v$version/Xray-windows-64.zip"
+          $archive = Join-Path $env:RUNNER_TEMP 'Xray-windows-64.zip'
+          $expectedSha256 = '1262522266337b824f07beb8e1375786b437683b3890105469088f8e17e0a69d'
+
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          $actualSha256 = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualSha256 -ne $expectedSha256) {
+            throw "Xray Core SHA-256 mismatch. Expected $expectedSha256, received $actualSha256"
+          }
+
+          $coreDir = Join-Path $env:GITHUB_WORKSPACE 'core'
+          if (Test-Path -LiteralPath $coreDir) {
+            Remove-Item -LiteralPath $coreDir -Recurse -Force
+          }
+          New-Item -ItemType Directory -Force -Path $coreDir | Out-Null
+          Expand-Archive -LiteralPath $archive -DestinationPath $coreDir -Force
+
+          $xrayExe = Join-Path $coreDir 'xray.exe'
+          if (-not (Test-Path -LiteralPath $xrayExe)) {
+            Get-ChildItem -LiteralPath $coreDir -Recurse | Select-Object FullName, Length | Format-Table -AutoSize
+            throw 'xray.exe was not found at the root of the extracted Xray Core archive.'
+          }
+
+          Write-Host "Xray Core v$version verified and extracted."
+          Get-ChildItem -LiteralPath $coreDir | Select-Object Name, Length | Format-Table -AutoSize
+
+      - name: Publish self-contained XrayHub
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          dotnet restore .\XrayHub.csproj
+          if ($LASTEXITCODE -ne 0) { throw 'dotnet restore failed.' }
+
+          $publishDir = Join-Path $env:RUNNER_TEMP 'XrayHub-publish'
+          if (Test-Path -LiteralPath $publishDir) {
+            Remove-Item -LiteralPath $publishDir -Recurse -Force
+          }
+
+          dotnet publish .\XrayHub.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            --output $publishDir
+          if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed.' }
+
+          $exePath = Join-Path $publishDir 'XrayHub.exe'
+          if (-not (Test-Path -LiteralPath $exePath)) {
+            Get-ChildItem -LiteralPath $publishDir -Recurse | Select-Object FullName, Length | Format-Table -AutoSize
+            throw 'XrayHub.exe was not produced.'
+          }
+
+          # The core is copied AFTER publish. The project file's Content glob is
+          # evaluated before the workflow downloads Xray, so it cannot be relied
+          # on to include these files in the publish folder automatically.
+          $sourceCoreDir = Join-Path $env:GITHUB_WORKSPACE 'core'
+          $publishCoreDir = Join-Path $publishDir 'core'
+          if (-not (Test-Path -LiteralPath (Join-Path $sourceCoreDir 'xray.exe'))) {
+            throw 'The downloaded core folder does not contain xray.exe.'
+          }
+          New-Item -ItemType Directory -Force -Path $publishCoreDir | Out-Null
+          Copy-Item -Path (Join-Path $sourceCoreDir '*') -Destination $publishCoreDir -Recurse -Force
+
+          if (-not (Test-Path -LiteralPath (Join-Path $publishCoreDir 'xray.exe'))) {
+            throw 'Xray Core was not copied into the publish folder.'
+          }
+
+          # Confirm the application icon and embedded flag resources are present
+          # in the project before the artifact is packaged.
+          $flagFiles = @(Get-ChildItem -LiteralPath '.\Assets\Flags' -Filter '*.png' -File -ErrorAction SilentlyContinue)
+          if ($flagFiles.Count -lt 1) {
+            throw 'No local country flag images were found in Assets\Flags.'
+          }
+          Write-Host "Found $($flagFiles.Count) bundled flag images."
+
+          $packageDir = Join-Path $env:RUNNER_TEMP 'XrayHub-Windows-x64'
+          if (Test-Path -LiteralPath $packageDir) {
+            Remove-Item -LiteralPath $packageDir -Recurse -Force
+          }
+          New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
+          Copy-Item -Path (Join-Path $publishDir '*') -Destination $packageDir -Recurse -Force
+
+          if (-not (Test-Path -LiteralPath (Join-Path $packageDir 'XrayHub.exe'))) {
+            throw 'XrayHub.exe is missing from the final package.'
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $packageDir 'core\xray.exe'))) {
+            throw 'core\xray.exe is missing from the final package.'
+          }
+
+          @'
+          XrayHub 0.3.0 - Windows x64
+
+          Start the application with XrayHub.exe.
+          The .NET 10 runtime is included in the self-contained executable.
+          Xray Core is included in the core folder.
+          Country flag images and the application icon are bundled with XrayHub.
+
+          TUN mode changes Windows network settings. Use it only when you
+          understand the network changes and can restore your connection.
+          '@ | Set-Content -LiteralPath (Join-Path $packageDir 'READ-ME-FIRST.txt') -Encoding UTF8
+
+          $zipPath = Join-Path $env:RUNNER_TEMP 'XrayHub-Windows-x64.zip'
+          if (Test-Path -LiteralPath $zipPath) {
+            Remove-Item -LiteralPath $zipPath -Force
+          }
+          Compress-Archive -Path (Join-Path $packageDir '*') -DestinationPath $zipPath -CompressionLevel Optimal
+
+          Write-Host "Created package: $zipPath"
+          Write-Host 'Final package contents:'
+          Get-ChildItem -LiteralPath $packageDir -Recurse | Select-Object FullName, Length | Format-Table -AutoSize
+
+      - name: Upload ready-to-run package
+        uses: actions/upload-artifact@v4
+        with:
+          name: XrayHub-Windows-x64
+          path: ${{ runner.temp }}\XrayHub-Windows-x64.zip
+          if-no-files-found: error
+          retention-days: 14
