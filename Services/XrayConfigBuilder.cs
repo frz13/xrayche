@@ -92,7 +92,7 @@ public static class XrayConfigBuilder
 
         var config = new JsonObject
         {
-            ["log"] = new JsonObject { ["loglevel"] = "warning" },
+            ["log"] = new JsonObject { ["loglevel"] = "info" },
             ["dns"] = new JsonObject
             {
                 ["servers"] = BuildDnsServers(settings),
