@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Net.Http;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Security.Principal;
@@ -13,6 +14,7 @@ using System.Text.Json;
 using Forms = System.Windows.Forms;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Navigation;
 using System.Windows.Threading;
 using XrayHub.Models;
@@ -38,6 +40,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _healthTimer = new() { Interval = TimeSpan.FromSeconds(25) };
     private readonly DispatcherTimer _subscriptionTimer = new() { Interval = TimeSpan.FromHours(3) };
     private readonly DispatcherTimer _noticeTimer = new() { Interval = TimeSpan.FromSeconds(8) };
+    private readonly DispatcherTimer _settingsAutosaveTimer = new() { Interval = TimeSpan.FromMilliseconds(650) };
     private readonly SemaphoreSlim _probeGate = new(1, 1);
     private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(20) };
     private XrayCoreService _core;
@@ -125,6 +128,26 @@ public partial class MainWindow : Window
         UpdateModeDescription();
         UpdateRoutingModeAvailability();
         ApplyUiLanguage();
+        _settingsAutosaveTimer.Tick += (_, _) =>
+        {
+            _settingsAutosaveTimer.Stop();
+            if (_initializing || _closing || _shutdownInProgress) return;
+            try
+            {
+                SaveSettingsFromUi();
+                AddLog("Изменения настроек и правил автоматически сохранены.");
+            }
+            catch (Exception ex)
+            {
+                // Invalid intermediate text (for example, while replacing a port) is not persisted.
+                AddLog("Автосохранение ожидает корректного значения: " + ex.Message);
+            }
+        };
+        RegisterSettingsAutosaveHandlers();
+        _routingRules.CollectionChanged += (_, _) => ScheduleSettingsAutosave();
+        RoutingRulesGrid.CellEditEnding += (_, _) =>
+            Dispatcher.BeginInvoke(new Action(ScheduleSettingsAutosave), DispatcherPriority.Background);
+
         _elapsedTimer.Tick += (_, _) => UpdateElapsed();
         _healthTimer.Tick += async (_, _) => await RunHealthProbeAsync();
         _subscriptionTimer.Tick += async (_, _) => await RefreshSubscriptionsAsync(false);
@@ -137,6 +160,50 @@ public partial class MainWindow : Window
         catch (Exception ex) { AddLog("Не удалось восстановить незавершённое исправление стороннего прокси: " + ex.Message); }
         try { _systemProxy.Restore(); }
         catch (Exception ex) { AddLog("Не удалось завершить восстановление системного прокси после предыдущего запуска: " + ex.Message); }
+    }
+
+    private void RegisterSettingsAutosaveHandlers()
+    {
+        TextBox[] textBoxes =
+        [
+            SocksPortTextBox, HttpPortTextBox, SocksUsernameTextBox,
+            SocksPasswordVisibleTextBox, TunAddressTextBox,
+            MuxTcpConcurrencyTextBox, MuxXudpConcurrencyTextBox, DnsServersTextBox
+        ];
+        foreach (var textBox in textBoxes)
+            textBox.TextChanged += (_, _) => ScheduleSettingsAutosave();
+
+        ComboBox[] comboBoxes =
+        [
+            ModeCombo, SettingsModeCombo, DefaultRouteCombo, TunMtuCombo,
+            ThemeCombo, LanguageCombo, MuxQuicCombo, FragmentPacketsCombo,
+            SubscriptionIntervalCombo
+        ];
+        foreach (var comboBox in comboBoxes)
+            comboBox.SelectionChanged += (_, _) => ScheduleSettingsAutosave();
+
+        ToggleButton[] toggles =
+        [
+            ProtectDnsLeaksCheckBox, BypassPrivateNetworksTrafficCheckBox,
+            DisableQuicTrafficCheckBox, YoutubeProbeTrafficCheckBox,
+            UseSystemProxyCheckBox, SocksAuthToggle, AutoStartAppToggle,
+            AutoStartMinimizedToggle, AutoConnectToggle, SaveWindowPositionToggle,
+            MuxEnabledToggle, FragmentationToggle, AutoUpdateSubscriptionsToggle
+        ];
+        foreach (var toggle in toggles)
+        {
+            toggle.Checked += (_, _) => ScheduleSettingsAutosave();
+            toggle.Unchecked += (_, _) => ScheduleSettingsAutosave();
+        }
+
+        SocksPasswordBox.PasswordChanged += (_, _) => ScheduleSettingsAutosave();
+    }
+
+    private void ScheduleSettingsAutosave()
+    {
+        if (_initializing || _closing || _shutdownInProgress) return;
+        _settingsAutosaveTimer.Stop();
+        _settingsAutosaveTimer.Start();
     }
 
     private void LoadSettingsToUi()
@@ -236,7 +303,19 @@ public partial class MainWindow : Window
         _settings.Language = LanguageCombo.SelectedValue?.ToString() == "en" ? "en" : "ru";
         _settings.AutoUpdateSubscriptions = AutoUpdateSubscriptionsToggle.IsChecked == true;
         _settings.SubscriptionUpdateIntervalHours = int.TryParse(SubscriptionIntervalCombo.SelectedValue?.ToString(), out var hours) && hours is 1 or 3 or 5 or 12 ? hours : 3;
-        _settings.RoutingRules = _routingRules.ToList();
+        var validRoutingRules = new List<RoutingRule>();
+        foreach (var rule in _routingRules)
+        {
+            var domains = SplitRuleText(rule.Domain ?? string.Empty);
+            if (domains.Count == 0) continue; // Ignore an unfinished empty row until the user fills it in.
+            foreach (var domain in domains)
+                if (!IsValidDomainRule(domain))
+                    throw new FormatException($"Некорректный домен в правиле маршрутизации: {domain}.");
+            if (rule.Action is not ("proxy" or "direct" or "block" or "blocked"))
+                throw new FormatException("Неизвестное действие в одном из правил маршрутизации.");
+            validRoutingRules.Add(rule);
+        }
+        _settings.RoutingRules = validRoutingRules;
         _settings.DefaultRoute = DefaultRouteCombo.SelectedValue?.ToString() ?? "proxy";
         ModeCombo.SelectedIndex = _settings.Mode.Contains("Туннель", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
         DnsServersTextBox.Text = dnsValue;
@@ -295,16 +374,21 @@ public partial class MainWindow : Window
             // Right after "started" the local inbounds (especially with TUN) may not accept connections yet,
             // which looked like a failed connection even though a retry succeeds.
             ConnectionInfo egress;
-            for (var attempt = 1; ; attempt++)
+            using (var verificationTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(28)))
             {
-                try
+                for (var attempt = 1; ; attempt++)
                 {
-                    egress = await _connectionInfoService.GetCurrentAsync(_settings);
-                    break;
-                }
-                catch (Exception retryEx) when (attempt < 4 && IsConnectionRefused(retryEx))
-                {
-                    await Task.Delay(1000);
+                    try
+                    {
+                        egress = await _connectionInfoService.GetCurrentAsync(_settings, verificationTimeout.Token);
+                        break;
+                    }
+                    catch (Exception retryEx) when (attempt < 3 && IsConnectionRefused(retryEx)
+                        && !verificationTimeout.IsCancellationRequested)
+                    {
+                        AddLog($"Локальный SOCKS ещё запускается; повторная проверка {attempt + 1}/3.");
+                        await Task.Delay(900, verificationTimeout.Token);
+                    }
                 }
             }
             AddLog($"Проверка выхода через Xray пройдена. Внешний IP: {egress.Ip}");
@@ -375,7 +459,6 @@ public partial class MainWindow : Window
     {
         if (_disconnecting) return;
         _disconnecting = true;
-        // UI state changes are immediate; potentially blocking Windows/process work runs off the dispatcher.
         ConnectButton.IsEnabled = false;
         _healthTimer.Stop();
         _elapsedTimer.Stop();
@@ -398,37 +481,51 @@ public partial class MainWindow : Window
             {
                 await _core.StopAsync().WaitAsync(TimeSpan.FromSeconds(10));
             }
-            catch (TimeoutException)
-            {
-                AddLog("Остановка ядра превысила лимит ожидания; интерфейс будет разблокирован.");
-            }
             catch (Exception ex)
             {
-                AddLog("Ошибка остановки ядра: " + ex.Message);
+                AddLog("Остановка ядра не подтверждена: " + ex.Message);
             }
         }
         finally
         {
-            // Always restore the UI even if registry restoration or process termination fails.
-            _connected = false;
+            var coreStillRunning = _core.IsRunning;
+            _connected = coreStillRunning;
             UpdateTrayState();
-            ModeCombo.IsEnabled = true;
-            SettingsModeCombo.IsEnabled = true;
-            _activeProfileId = null;
+            ModeCombo.IsEnabled = !coreStillRunning;
+            SettingsModeCombo.IsEnabled = !coreStillRunning;
             _connectionInfoCancellation?.Cancel();
             ConnectionDetailsOverlay.Visibility = Visibility.Collapsed;
-            SetConnectionStatus("Отключено", connected: false);
-            ConnectionDot.Fill = (System.Windows.Media.Brush)FindResource("TextMuted");
-            ElapsedText.Text = "00:00:00";
-            ConnectButton.Content = L("Подключить");
-            ConnectButton.Background = (System.Windows.Media.Brush)FindResource("Accent");
-            ConnectButton.BorderBrush = (System.Windows.Media.Brush)FindResource("Accent");
-            ConnectButton.Foreground = System.Windows.Media.Brushes.White;
-            CoreStatusText.Text = L("Ядро не запущено");
-            FooterText.Text = L("Готово · Xray Core не запущен");
+
+            if (coreStillRunning)
+            {
+                // Do not tell the user that the VPN is disconnected while xray.exe is alive.
+                SetConnectionStatus("Отключение не завершено", connected: false);
+                ConnectionDot.Fill = (System.Windows.Media.Brush)FindResource("Accent");
+                ConnectButton.Content = L("Повторить отключение");
+                ConnectButton.Background = (System.Windows.Media.Brush)FindResource("Panel2");
+                ConnectButton.BorderBrush = (System.Windows.Media.Brush)FindResource("Line");
+                ConnectButton.Foreground = (System.Windows.Media.Brush)FindResource("TextMain");
+                CoreStatusText.Text = L("Xray Core всё ещё работает");
+                FooterText.Text = L("Остановка не подтверждена · повтори отключение");
+                AddLog("Xray всё ещё работает. Состояние подключения сохранено; повторное нажатие попробует остановить ядро ещё раз.");
+            }
+            else
+            {
+                _activeProfileId = null;
+                SetConnectionStatus("Отключено", connected: false);
+                ConnectionDot.Fill = (System.Windows.Media.Brush)FindResource("TextMuted");
+                ElapsedText.Text = "00:00:00";
+                ConnectButton.Content = L("Подключить");
+                ConnectButton.Background = (System.Windows.Media.Brush)FindResource("Accent");
+                ConnectButton.BorderBrush = (System.Windows.Media.Brush)FindResource("Accent");
+                ConnectButton.Foreground = System.Windows.Media.Brushes.White;
+                CoreStatusText.Text = L("Ядро не запущено");
+                FooterText.Text = L("Готово · Xray Core не запущен");
+                AddLog("Остановка Xray подтверждена. Соединение отключено.");
+            }
+
             ConnectButton.IsEnabled = true;
             _disconnecting = false;
-            AddLog("Запрос отключения завершён; состояние интерфейса сброшено.");
         }
     }
 
@@ -575,7 +672,7 @@ public partial class MainWindow : Window
         PingAllButton.IsEnabled = false;
         PingAllButton.Content = _settings.Language == "en" ? "Checking…" : "Проверка…";
         foreach (var profile in _profiles) profile.PingDisplay = "…";
-        AddLog($"Запущена ICMP-проверка для {_profiles.Count} серверов.");
+        AddLog($"Запущена TCP-проверка доступности {_profiles.Count} серверов.");
 
         using var limiter = new SemaphoreSlim(6, 6);
         try
@@ -596,12 +693,12 @@ public partial class MainWindow : Window
                 if (result.Result.Milliseconds.HasValue)
                     AddLog($"Задержка {result.Profile.DisplayName}: {result.Result.Display} ({result.Result.Method}).");
                 else
-                    AddLog($"Сервер не ответил на ICMP: {result.Profile.DisplayName}.");
+                    AddLog($"TCP-проверка не прошла: {result.Profile.DisplayName}.");
             }
 
             var success = results.Count(x => x.Result.Milliseconds.HasValue);
             ShowNotice(
-                $"Проверка ICMP завершена: получен ответ от {success} из {results.Length} серверов.",
+                $"TCP-проверка завершена: ответили {success} из {results.Length} серверов.",
                 "Пинг серверов", MessageBoxButton.OK, success > 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }
         finally
@@ -613,31 +710,31 @@ public partial class MainWindow : Window
 
     private static async Task<(string Display, long? Milliseconds, string Method)> MeasureServerLatencyAsync(ProxyProfile profile)
     {
-        var (host, _) = ResolveProfileEndpoint(profile);
-        if (string.IsNullOrWhiteSpace(host))
+        var (host, port) = ResolveProfileEndpoint(profile);
+        if (string.IsNullOrWhiteSpace(host) || port is < 1 or > 65535)
             return ("~", null, "unavailable");
 
-        // This is an ICMP-only test. A blocked or unanswered ICMP echo is shown as unavailable;
-        // TCP connect time is intentionally not used as a substitute for ping.
+        // TCP connect time is more useful than ICMP for proxy endpoints: many servers
+        // block echo requests, and ICMP does not test whether the configured port is reachable.
         try
         {
-            using var ping = new Ping();
-            var reply = await ping.SendPingAsync(host, 1600);
-            if (reply.Status == IPStatus.Success)
-                return ($"{reply.RoundtripTime} ms", reply.RoundtripTime, "ICMP");
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            using var client = new TcpClient();
+            var stopwatch = Stopwatch.StartNew();
+            await client.ConnectAsync(host, port, timeout.Token);
+            stopwatch.Stop();
+            var elapsed = Math.Max(1, stopwatch.ElapsedMilliseconds);
+            return ($"{elapsed} ms", elapsed, "TCP");
         }
         catch
         {
-            // No fallback: the UI must distinguish an unanswered ICMP echo from a real reply.
+            return ("~", null, "unavailable");
         }
-
-        return ("~", null, "unavailable");
     }
 
     private static (string Host, int Port) ResolveProfileEndpoint(ProxyProfile profile)
     {
-        // ICMP does not use a transport port. Keep a known host even when a profile
-        // has an unusual/missing port value so the ping test can still run.
+        // TCP latency checks require the actual proxy endpoint port.
         if (!string.IsNullOrWhiteSpace(profile.Server))
             return (profile.Server, profile.Port);
 
@@ -2420,7 +2517,9 @@ public partial class MainWindow : Window
     {
         if (_trayConnectItem is null || _trayOpenItem is null || _trayExitItem is null) return;
         var english = _settings.Language == "en";
-        _trayConnectItem.Text = english ? "Connect to last server" : "Подключиться к последнему серверу";
+        _trayConnectItem.Text = _connected
+            ? (english ? "Disconnect from current server" : "Отключиться от текущего сервера")
+            : (english ? "Connect to last server" : "Подключиться к последнему серверу");
         _trayOpenItem.Text = english ? "Open XrayHub" : "Открыть XrayHub";
         _trayExitItem.Text = english ? "Exit" : "Выход";
     }
@@ -2429,7 +2528,12 @@ public partial class MainWindow : Window
     {
         if (_trayIcon is null) return;
         if (_trayConnectItem is not null)
-            _trayConnectItem.Enabled = !_connected && _profiles.Count > 0;
+        {
+            _trayConnectItem.Text = _connected
+                ? (_settings.Language == "en" ? "Disconnect from current server" : "Отключиться от текущего сервера")
+                : (_settings.Language == "en" ? "Connect to last server" : "Подключиться к последнему серверу");
+            _trayConnectItem.Enabled = _connected || _profiles.Count > 0;
+        }
         _trayIcon.Text = _connected ? (L("XrayHub · Подключено")) : (L("XrayHub · Готово"));
 
         if (_baseTrayIcon is not null)
@@ -2443,9 +2547,10 @@ public partial class MainWindow : Window
 
     private async Task ConnectLastProfileFromTrayAsync()
     {
+        if (_disconnecting) return;
         if (_connected)
         {
-            ShowNotice("XrayHub уже подключён к серверу.", "XrayHub", MessageBoxButton.OK, MessageBoxImage.Information);
+            await DisconnectAsync();
             return;
         }
         var profile = _settings.LastProfileId.HasValue

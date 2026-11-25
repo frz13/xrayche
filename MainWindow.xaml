@@ -690,10 +690,9 @@
                                         <Button Content="Ниже" Click="MoveRoutingRuleDown_Click" Padding="10,6" />
                                     </StackPanel>
                                     <TextBlock Text="Введи корректное доменное имя, например google.com или sub.example.org, затем выбери действие. Несколько доменов можно разделить запятыми." FontSize="10" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,9,0,0" />
-                                    <Button Content="Сохранить маршрутизацию" Click="SaveRoutingRules_Click" HorizontalAlignment="Left" Margin="0,12,0,0" Background="{DynamicResource Accent}" BorderBrush="{DynamicResource Accent}" />
                                 </StackPanel>
                             </Border>
-                            <TextBlock Text="Правила записываются в конфигурацию Xray и применяются при следующем подключении." FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="2,9,2,0" />
+                            <TextBlock Text="Правила сохраняются автоматически после изменения и применяются при следующем подключении." FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="2,9,2,0" />
                             </StackPanel>
                         </Grid>
                     </ScrollViewer>
@@ -828,8 +827,7 @@
                                 </StackPanel>
                             </Border>
 
-                            <Button Content="Сохранить настройки" Click="SaveSettings_Click" HorizontalAlignment="Left" Background="{DynamicResource Accent}" BorderBrush="{DynamicResource Accent}" />
-                            <TextBlock Text="Сетевые параметры применяются при следующем подключении." FontSize="10" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                            <TextBlock Text="Настройки сохраняются автоматически. Сетевые параметры применяются при следующем подключении." FontSize="10" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,8,0,0"/>
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>

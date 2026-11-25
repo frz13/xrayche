@@ -404,6 +404,9 @@ public static class XrayConfigBuilder
                 inbounds.Add(tun);
             }
             if (string.IsNullOrWhiteSpace(tun["tag"]?.GetValue<string>())) tun["tag"] = "tun-in";
+            // Imported profiles may already define a TUN inbound without sniffing.
+            // Without sniffing, domain-based XrayHub rules cannot match TUN packets by hostname.
+            tun["sniffing"] = BuildSniffing();
             var tunTag = tun["tag"]!.GetValue<string>();
             if (tun["settings"] is not JsonObject tunSettings)
             {

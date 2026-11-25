@@ -11,7 +11,14 @@ public sealed class XrayCoreService : IAsyncDisposable
     private readonly SemaphoreSlim _gate = new(1, 1);
     public event Action<string>? LogReceived;
     public event Action<bool>? RunningChanged;
-    public bool IsRunning => _process is { HasExited: false };
+    public bool IsRunning
+    {
+        get
+        {
+            try { return _process is { } process && !process.HasExited; }
+            catch { return false; }
+        }
+    }
 
     public XrayCoreService(ProfileStore store) => _store = store;
 
@@ -50,7 +57,12 @@ public sealed class XrayCoreService : IAsyncDisposable
             _process = new Process { StartInfo = start, EnableRaisingEvents = true };
             _process.OutputDataReceived += (_, e) => { if (!string.IsNullOrWhiteSpace(e.Data)) LogReceived?.Invoke(e.Data); };
             _process.ErrorDataReceived += (_, e) => { if (!string.IsNullOrWhiteSpace(e.Data)) LogReceived?.Invoke(e.Data); };
-            _process.Exited += (_, _) => RunningChanged?.Invoke(false);
+            _process.Exited += (_, _) =>
+            {
+                try { LogReceived?.Invoke($"Процесс Xray завершился. Код выхода: {_process?.ExitCode.ToString() ?? "неизвестен"}."); }
+                catch { LogReceived?.Invoke("Процесс Xray завершился; код выхода получить не удалось."); }
+                RunningChanged?.Invoke(false);
+            };
             if (!_process.Start()) throw new InvalidOperationException("Не удалось запустить xray.exe.");
             _process.BeginOutputReadLine();
             _process.BeginErrorReadLine();
@@ -76,13 +88,14 @@ public sealed class XrayCoreService : IAsyncDisposable
         {
             acquired = await _gate.WaitAsync(TimeSpan.FromSeconds(2));
             if (!acquired)
-            {
-                const string message = "Не удалось безопасно остановить Xray: операция запуска ещё выполняется. Повторите отключение.";
-                LogReceived?.Invoke(message);
-                throw new TimeoutException(message);
-            }
+                throw new TimeoutException("Не удалось получить блокировку Xray за 2 секунды; предыдущая операция ещё выполняется.");
 
             await StopInternalAsync();
+        }
+        catch (TimeoutException ex)
+        {
+            LogReceived?.Invoke("Остановка Xray не подтверждена: " + ex.Message);
+            throw;
         }
         finally
         {
@@ -116,14 +129,12 @@ public sealed class XrayCoreService : IAsyncDisposable
             }
             else
             {
-                LogReceived?.Invoke("Xray ещё работает после запроса остановки; ссылка на процесс сохранена для повторной попытки.");
+                throw new TimeoutException("Xray продолжает работать после запроса остановки.");
             }
         }
         catch (Exception ex)
         {
             LogReceived?.Invoke("Ошибка остановки ядра: " + ex.Message);
-            // Do not report a successful stop or allow StartAsync to continue while
-            // the previous process may still own the TUN adapter or other resources.
             throw;
         }
         finally
