@@ -77,15 +77,12 @@ public sealed class XrayCoreService : IAsyncDisposable
             acquired = await _gate.WaitAsync(TimeSpan.FromSeconds(2));
             if (!acquired)
             {
-                LogReceived?.Invoke("Остановка Xray не дождалась блокировки запуска; интерфейс продолжит работу.");
-                return;
+                const string message = "Не удалось безопасно остановить Xray: операция запуска ещё выполняется. Повторите отключение.";
+                LogReceived?.Invoke(message);
+                throw new TimeoutException(message);
             }
 
             await StopInternalAsync();
-        }
-        catch (TimeoutException)
-        {
-            LogReceived?.Invoke("Остановка Xray превысила лимит времени; интерфейс разблокирован.");
         }
         finally
         {
@@ -125,6 +122,9 @@ public sealed class XrayCoreService : IAsyncDisposable
         catch (Exception ex)
         {
             LogReceived?.Invoke("Ошибка остановки ядра: " + ex.Message);
+            // Do not report a successful stop or allow StartAsync to continue while
+            // the previous process may still own the TUN adapter or other resources.
+            throw;
         }
         finally
         {
