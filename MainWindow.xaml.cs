@@ -726,17 +726,41 @@ public partial class MainWindow : Window
         if (string.IsNullOrWhiteSpace(host) || port is < 1 or > 65535)
             return ("~", null, "unavailable");
 
-        // TCP connect time is more useful than ICMP for proxy endpoints: many servers
-        // block echo requests, and ICMP does not test whether the configured port is reachable.
+        // Measure the endpoint over the physical network, not through XrayHub's own
+        // TUN route. Bind the socket to a physical adapter source address, then connect
+        // to a resolved IPv4 endpoint.
         try
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-            using var client = new TcpClient();
+            var addresses = IPAddress.TryParse(host, out var literal)
+                ? new[] { literal! }
+                : await Dns.GetHostAddressesAsync(host, timeout.Token);
+            var remote = addresses.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork);
+            if (remote is null) return ("~", null, "unavailable");
+
+            var local = NetworkInterface.GetAllNetworkInterfaces()
+                .Where(n => n.OperationalStatus == OperationalStatus.Up
+                    && (n.NetworkInterfaceType == NetworkInterfaceType.Ethernet || n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211))
+                .SelectMany(n =>
+                {
+                    var hasGateway = n.GetIPProperties().GatewayAddresses.Any(g => g.Address.AddressFamily == AddressFamily.InterNetwork
+                        && !g.Address.Equals(IPAddress.Any));
+                    return hasGateway
+                        ? n.GetIPProperties().UnicastAddresses
+                            .Where(u => u.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(u.Address))
+                            .Select(u => u.Address)
+                        : Enumerable.Empty<IPAddress>();
+                })
+                .FirstOrDefault();
+            if (local is null) return ("~", null, "unavailable");
+
+            using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            socket.Bind(new IPEndPoint(local, 0));
             var stopwatch = Stopwatch.StartNew();
-            await client.ConnectAsync(host, port, timeout.Token);
+            await socket.ConnectAsync(new IPEndPoint(remote, port), timeout.Token);
             stopwatch.Stop();
             var elapsed = Math.Max(1, stopwatch.ElapsedMilliseconds);
-            return ($"{elapsed} ms", elapsed, "TCP");
+            return ($"{elapsed} ms", elapsed, "TCP direct");
         }
         catch
         {

@@ -54,22 +54,24 @@ public sealed class XrayCoreService : IAsyncDisposable
             start.ArgumentList.Add("-c");
             start.ArgumentList.Add(configPath);
 
-            _process = new Process { StartInfo = start, EnableRaisingEvents = true };
-            _process.OutputDataReceived += (_, e) => { if (!string.IsNullOrWhiteSpace(e.Data)) LogReceived?.Invoke(e.Data); };
-            _process.ErrorDataReceived += (_, e) => { if (!string.IsNullOrWhiteSpace(e.Data)) LogReceived?.Invoke(e.Data); };
-            _process.Exited += (_, _) =>
+            var process = new Process { StartInfo = start, EnableRaisingEvents = true };
+            _process = process;
+            process.OutputDataReceived += (_, e) => { if (!string.IsNullOrWhiteSpace(e.Data)) LogReceived?.Invoke(e.Data); };
+            process.ErrorDataReceived += (_, e) => { if (!string.IsNullOrWhiteSpace(e.Data)) LogReceived?.Invoke(e.Data); };
+            process.Exited += (_, _) =>
             {
-                try { LogReceived?.Invoke($"Процесс Xray завершился. Код выхода: {_process?.ExitCode.ToString() ?? "неизвестен"}."); }
+                try { LogReceived?.Invoke($"Процесс Xray завершился. Код выхода: {process.ExitCode}."); }
                 catch { LogReceived?.Invoke("Процесс Xray завершился; код выхода получить не удалось."); }
-                RunningChanged?.Invoke(false);
+                if (ReferenceEquals(Volatile.Read(ref _process), process))
+                    RunningChanged?.Invoke(false);
             };
-            if (!_process.Start()) throw new InvalidOperationException("Не удалось запустить xray.exe.");
-            _process.BeginOutputReadLine();
-            _process.BeginErrorReadLine();
+            if (!process.Start()) throw new InvalidOperationException("Не удалось запустить xray.exe.");
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
             await Task.Delay(900, cancellationToken);
-            if (_process.HasExited)
+            if (process.HasExited)
             {
-                var code = _process.ExitCode;
+                var code = process.ExitCode;
                 await StopInternalAsync();
                 throw new InvalidOperationException($"Xray завершился при запуске (код {code}). Проверь лог ядра.");
             }

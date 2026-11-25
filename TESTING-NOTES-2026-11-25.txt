@@ -1,0 +1,7 @@
+XrayHub source patch for user testing
+
+Changes in this archive:
+1. Server TCP latency check resolves the endpoint to IPv4 and binds the probe socket to an IPv4 address on an operational Ethernet/Wi-Fi adapter with a default gateway, avoiding routing the probe through XrayHub's own TUN interface.
+2. Xray process Exited callback captures the exact process instance. An old process exiting late can no longer report a false stopped event for a replacement process.
+
+Important: this archive contains source code, not a compiled EXE. It was not compiled or runtime-tested in this environment (dotnet SDK is unavailable here). TUN adapter creation errors in the supplied log remain an item to validate with a fresh Windows test; this patch does not claim to have conclusively fixed the adapter/driver issue.
