@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Net.Http;
@@ -376,33 +376,57 @@ public partial class MainWindow : Window
             SetConnectionStatus("Запуск ядра…", connected: false);
             FooterText.Text = L("Проверка конфигурации Xray…");
             AddLog($"Подготовка подключения: {profile.DisplayName}");
-            await _core.StartAsync(profile, _settings, tunnelMode);
-
-            if (!tunnelMode && _settings.UseSystemProxy)
-                _systemProxy.Enable("127.0.0.1", _settings.HttpPort);
-
-            // Do not report a successful connection merely because xray.exe started.
-            // This request is explicitly routed through XrayHub's local SOCKS inbound.
-            // Right after "started" the local inbounds (especially with TUN) may not accept connections yet,
-            // which looked like a failed connection even though a retry succeeds.
-            ConnectionInfo egress;
-            using (var verificationTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(28)))
+            // A TUN startup can fail transiently while the Windows adapter is being
+            // released by a previous Xray process. If Xray exits during startup or
+            // egress verification, clean up the exited process, allow the adapter
+            // driver to settle, and retry the whole startup once. Do not retry while
+            // Xray is still running: that would hide ordinary proxy/network failures.
+            ConnectionInfo? egress = null;
+            var xrayStarted = false;
+            for (var startupAttempt = 1; startupAttempt <= 2; startupAttempt++)
             {
-                for (var attempt = 1; ; attempt++)
+                try
                 {
-                    try
+                    await _core.StartAsync(profile, _settings, tunnelMode);
+                    xrayStarted = true;
+
+                    if (!tunnelMode && _settings.UseSystemProxy)
+                        _systemProxy.Enable("127.0.0.1", _settings.HttpPort);
+
+                    // Do not report success merely because xray.exe started.
+                    // Verify the public egress through the local SOCKS inbound.
+                    using var verificationTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(28));
+                    for (var attempt = 1; ; attempt++)
                     {
-                        egress = await _connectionInfoService.GetCurrentAsync(_settings, verificationTimeout.Token);
-                        break;
+                        try
+                        {
+                            egress = await _connectionInfoService.GetCurrentAsync(_settings, verificationTimeout.Token);
+                            break;
+                        }
+                        catch (Exception retryEx) when (attempt < 3 && IsConnectionRefused(retryEx)
+                            && !verificationTimeout.IsCancellationRequested)
+                        {
+                            AddLog($"Локальный SOCKS ещё запускается; повторная проверка {attempt + 1}/3.");
+                            await Task.Delay(900, verificationTimeout.Token);
+                        }
                     }
-                    catch (Exception retryEx) when (attempt < 3 && IsConnectionRefused(retryEx)
-                        && !verificationTimeout.IsCancellationRequested)
-                    {
-                        AddLog($"Локальный SOCKS ещё запускается; повторная проверка {attempt + 1}/3.");
-                        await Task.Delay(900, verificationTimeout.Token);
-                    }
+
+                    break;
+                }
+                catch (Exception startupError) when (tunnelMode && startupAttempt == 1
+                    && ((!_core.IsRunning && xrayStarted)
+                        || startupError.Message.StartsWith("Xray завершился при запуске", StringComparison.Ordinal)))
+                {
+                    AddLog("Xray завершился во время запуска/проверки TUN. Выполняю одну повторную попытку после очистки процесса: " + startupError.Message);
+                    await _core.StopAsync();
+                    await Task.Delay(TimeSpan.FromSeconds(3));
+                    AddLog("Повторный запуск TUN после ожидания освобождения адаптера.");
                 }
             }
+
+            if (egress is null)
+                throw new InvalidOperationException("Не удалось подтвердить внешний IP через Xray.");
+
             AddLog($"Проверка выхода через Xray пройдена. Внешний IP: {egress.Ip}");
 
             _connected = true;
