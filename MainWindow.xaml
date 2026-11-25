@@ -455,8 +455,7 @@
                                         </Button>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
                                             <TextBlock x:Name="ElapsedText" Text="00:00:00" FontSize="12" FontFamily="Consolas" Foreground="{DynamicResource TextMuted}" />
-                                            <TextBlock Text="  ·  " FontSize="11" Foreground="{DynamicResource TextMuted}" />
-                                            <TextBlock x:Name="CoreStatusText" Text="Ядро не запущено" FontSize="11" Foreground="{DynamicResource TextMuted}" />
+                                            <TextBlock x:Name="CoreStatusText" Visibility="Collapsed" Text="Ядро не запущено" FontSize="11" Foreground="{DynamicResource TextMuted}" />
                                         </StackPanel>
                                     </StackPanel>
                                     <Button x:Name="ConnectButton" Grid.Column="1" Content="Подключить" Click="ConnectButton_Click"
@@ -611,7 +610,10 @@
                 <!-- ROUTING -->
                 <TabItem>
                     <ScrollViewer x:Name="RoutingPageScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel Margin="20,18,20,18">
+                        <Grid Margin="20,18,20,18">
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                            <TextBlock x:Name="RoutingProxyNotice" Text="Пользовательские правила доступны только в режиме «Туннель»" Visibility="Collapsed" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,12" />
+                            <StackPanel x:Name="RoutingPageContent" Grid.Row="1">
                             <TextBlock Text="Задай, через какой выход отправлять отдельные домены, IP-адреса и порты." FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,13" />
 
                             <Border Style="{StaticResource CardBorder}" Margin="0,0,0,10">
@@ -692,7 +694,8 @@
                                 </StackPanel>
                             </Border>
                             <TextBlock Text="Правила записываются в конфигурацию Xray и применяются при следующем подключении." FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="2,9,2,0" />
-                        </StackPanel>
+                            </StackPanel>
+                        </Grid>
                     </ScrollViewer>
                 </TabItem>
 
@@ -871,7 +874,7 @@
 
             <Border Grid.Row="3" Background="{DynamicResource FooterBg}" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0">
                 <Grid Margin="15,0">
-                    <TextBlock x:Name="FooterText" Text="Готово · Xray Core не запущен" FontSize="9" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" />
+                    <TextBlock x:Name="FooterText" Visibility="Collapsed" Text="Готово · Xray Core не запущен" FontSize="9" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" />
                     <TextBlock Text="XRAYHUB 0.3.15" FontSize="8" Foreground="{DynamicResource TextMuted}" HorizontalAlignment="Right" VerticalAlignment="Center" />
                 </Grid>
             </Border>

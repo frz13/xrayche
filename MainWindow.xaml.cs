@@ -123,6 +123,7 @@ public partial class MainWindow : Window
         UpdateSocksAuthControls();
         UpdateNavigationState();
         UpdateModeDescription();
+        UpdateRoutingModeAvailability();
         ApplyUiLanguage();
         _elapsedTimer.Tick += (_, _) => UpdateElapsed();
         _healthTimer.Tick += async (_, _) => await RunHealthProbeAsync();
@@ -284,8 +285,6 @@ public partial class MainWindow : Window
             SetConnectionStatus("Запуск ядра…", connected: false);
             FooterText.Text = L("Проверка конфигурации Xray…");
             AddLog($"Подготовка подключения: {profile.DisplayName}");
-            // Non-secret summary of how the profile will be sent to Xray (no server address, UUID, keys or passwords).
-            AddLog($"Параметры профиля: {profile.Protocol}/{profile.Network}/{profile.Security}, port={profile.Port}, sni={profile.Sni}, host={profile.Host}, alpn={profile.Alpn}, fp={profile.Fingerprint}, serviceName={profile.ServiceName}, mode={profile.Mode}, flow={profile.Flow}, allowInsecure={profile.AllowInsecure}, path={profile.Path}, query=[{string.Join(",", profile.RawQueryParameters.Keys)}]");
             await _core.StartAsync(profile, _settings, tunnelMode);
 
             if (!tunnelMode && _settings.UseSystemProxy)
@@ -332,7 +331,6 @@ public partial class MainWindow : Window
             UpdateElapsed();
             AddLog("Соединение активно.");
             _ = RunHealthProbeAsync();
-            _ = VerifyRoutedTrafficAsync(profile.Id, tunnelMode, egress.Ip);
         }
         catch (Exception ex)
         {
@@ -1996,6 +1994,18 @@ public partial class MainWindow : Window
             _store.SaveSettings(_settings);
         }
         UpdateModeDescription();
+        UpdateRoutingModeAvailability();
+    }
+
+    private void UpdateRoutingModeAvailability()
+    {
+        if (ModeCombo is null || RoutingPageContent is null || RoutingProxyNotice is null) return;
+        var tunnelMode = ModeCombo.SelectedIndex == 1;
+        RoutingPageContent.IsEnabled = tunnelMode;
+        RoutingPageContent.Opacity = tunnelMode ? 1.0 : 0.45;
+        RoutingProxyNotice.Visibility = tunnelMode ? Visibility.Collapsed : Visibility.Visible;
+        RoutingNavButton.IsEnabled = true;
+        if (!tunnelMode && PageTabs.SelectedIndex == 3) PageTabs.SelectedIndex = 0;
     }
 
     private void UpdateModeDescription()
@@ -2004,60 +2014,6 @@ public partial class MainWindow : Window
         ModeDescription.Text = L(ModeCombo.SelectedIndex == 1
             ? "TUN перенаправляет системный трафик через виртуальный сетевой интерфейс. Для запуска требуются права администратора."
             : "Прокси использует локальные SOCKS/HTTP-входы и, при включении, системные настройки Windows.");
-    }
-
-    /// <summary>
-    /// The connect check goes through the local SOCKS inbound only. This verifies the path the rest of
-    /// Windows uses (system proxy / TUN), repairs the system proxy if it was not applied or got reverted,
-    /// and logs what it found. It never changes the connection state.
-    /// </summary>
-    private async Task VerifyRoutedTrafficAsync(Guid profileId, bool tunnelMode, string socksIp)
-    {
-        try
-        {
-            await Task.Delay(1500);
-            if (!_connected || _activeProfileId != profileId) return;
-
-            if (!tunnelMode)
-            {
-                if (!_settings.UseSystemProxy)
-                {
-                    AddLog($"Системный прокси Windows выключен в настройках: браузер НЕ использует Xray. Включи «Использовать системный прокси» или укажи в программе HTTP-прокси 127.0.0.1:{_settings.HttpPort}.");
-                    return;
-                }
-
-                var expected = $"127.0.0.1:{_settings.HttpPort}";
-                bool Applied(WindowsProxySnapshot s) => s.ProxyEnable == 1
-                    && (s.ProxyServer ?? string.Empty).Replace(" ", string.Empty).Contains(expected, StringComparison.OrdinalIgnoreCase);
-
-                var snapshot = await Task.Run(_systemProxy.ReadCurrentSnapshot);
-                AddLog($"Системный прокси Windows: ProxyEnable={snapshot.ProxyEnable?.ToString() ?? "—"}, ProxyServer={snapshot.ProxyServer ?? "—"}, PAC={(string.IsNullOrWhiteSpace(snapshot.AutoConfigUrl) ? "нет" : snapshot.AutoConfigUrl)}, AutoDetect={snapshot.AutoDetect?.ToString() ?? "—"}.");
-                if (!Applied(snapshot))
-                {
-                    AddLog("Системный прокси не применён или был сброшен. Применяю повторно.");
-                    await Task.Run(() => _systemProxy.Enable("127.0.0.1", _settings.HttpPort));
-                    await Task.Delay(500);
-                    snapshot = await Task.Run(_systemProxy.ReadCurrentSnapshot);
-                    AddLog(Applied(snapshot)
-                        ? "Системный прокси применён повторно."
-                        : $"Не удалось закрепить системный прокси (ProxyEnable={snapshot.ProxyEnable?.ToString() ?? "—"}, ProxyServer={snapshot.ProxyServer ?? "—"}). Возможно, его сбрасывает другая программа.");
-                }
-            }
-
-            // Proxy mode: ask through the local HTTP inbound that Windows is told to use.
-            // TUN mode: ask with no proxy at all, exactly like any other program.
-            var systemIp = await _connectionInfoService.GetIpAsync(tunnelMode ? null : _settings.HttpPort);
-            if (!_connected || _activeProfileId != profileId) return;
-
-            if (string.Equals(systemIp, socksIp, StringComparison.OrdinalIgnoreCase))
-                AddLog($"Проверка маршрута пройдена: {(tunnelMode ? "системный трафик" : "HTTP-вход Xray")} выходит с IP {systemIp}.");
-            else
-                AddLog($"ВНИМАНИЕ: через SOCKS внешний IP {socksIp}, а {(tunnelMode ? "обычный системный трафик" : "HTTP-вход Xray")} выходит с IP {systemIp}. Трафик не проходит через сервер.");
-        }
-        catch (Exception ex)
-        {
-            AddLog("Проверка маршрута не выполнена: " + ex.Message);
-        }
     }
 
     private async Task RunHealthProbeAsync()
@@ -2312,7 +2268,16 @@ public partial class MainWindow : Window
     private void GoHome_Click(object sender, RoutedEventArgs e) => PageTabs.SelectedIndex = 0;
     private void GoToProfiles_Click(object sender, RoutedEventArgs e) => PageTabs.SelectedIndex = 1;
     private void GoToTraffic_Click(object sender, RoutedEventArgs e) => PageTabs.SelectedIndex = 2;
-    private void GoToRouting_Click(object sender, RoutedEventArgs e) => PageTabs.SelectedIndex = 3;
+    private void GoToRouting_Click(object sender, RoutedEventArgs e)
+    {
+        if (ModeCombo.SelectedIndex != 1)
+        {
+            UpdateRoutingModeAvailability();
+            PageTabs.SelectedIndex = 3;
+            return;
+        }
+        PageTabs.SelectedIndex = 3;
+    }
     private void GoToSettings_Click(object sender, RoutedEventArgs e) => PageTabs.SelectedIndex = 4;
     private void OpenLogs_Click(object sender, RoutedEventArgs e) => PageTabs.SelectedIndex = 5;
     private void ClearLogs_Click(object sender, RoutedEventArgs e)

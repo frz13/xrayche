@@ -260,32 +260,6 @@ public sealed class ConnectionInfoService
         return false;
     }
 
-    /// <summary>
-    /// Public IP seen by a plain HTTP client. With httpProxyPort the request goes through the local
-    /// Xray HTTP inbound; with null it uses no proxy (the normal Windows route).
-    /// </summary>
-    public async Task<string> GetIpAsync(int? httpProxyPort, CancellationToken cancellationToken = default)
-    {
-        using var handler = new HttpClientHandler();
-        if (httpProxyPort.HasValue)
-        {
-            handler.UseProxy = true;
-            handler.Proxy = new WebProxy($"http://127.0.0.1:{httpProxyPort.Value}");
-        }
-        else handler.UseProxy = false;
-
-        using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(10) };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("XrayHub");
-        using var response = await client.GetAsync("https://ipwho.is/", cancellationToken);
-        response.EnsureSuccessStatusCode();
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-        var ip = GetString(document.RootElement, "ip");
-        if (!IPAddress.TryParse(ip, out _))
-            throw new InvalidOperationException("Сервис вернул некорректный IP-адрес.");
-        return ip;
-    }
-
     private static string GetString(JsonElement parent, string name) =>
         TryGet(parent, name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? string.Empty : string.Empty;
 
