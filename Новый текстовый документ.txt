@@ -1,0 +1,82 @@
+[10:49:00] XrayHub запущен. Ядро Xray загружается из встроенной папки core.
+[10:49:03] Подготовка подключения: Johannesburg @BlockNetVPN
+[10:49:03] Xray Core: Xray 26.11.9 (Xray, Penetrates Everything.) 676eaf6 (go1.27.3 windows/amd64)
+[10:49:03] Xray Core: A unified platform for anti-censorship.
+[10:49:03] Xray Core: 2026/11/25 10:49:03.483802 [Info] infra/conf/serial: Reading config: &{Name:C:\Users\PC\AppData\Roaming\XrayHub\runtime\config.json Format:json}
+[10:49:03] Xray Core: 2026/11/25 10:49:03.484786 [Warning] common/errors: The feature gRPC transport (with unnecessary costs, etc.) is deprecated, not recommended for using and might be removed. Please migrate to XHTTP stream-up H2 as soon as possible.
+[10:49:03] Xray Core: 2026/11/25 10:49:03.484786 [Warning] common/errors: The feature Trojan (with no Flow, etc.) is deprecated, not recommended for using and might be removed. Please migrate to VLESS with Flow & Seed as soon as possible.
+[10:49:03] Xray Core: 2026/11/25 10:49:03.492803 Failed to find matching adapter name: Р­Р»РµРјРµРЅС‚ РЅРµ РЅР°Р№РґРµРЅ. (Code 0x00000490)
+[10:49:03] Xray Core: 2026/11/25 10:49:03.559963 Using existing driver 0.14
+[10:49:03] Xray Core: 2026/11/25 10:49:03.566107 Creating adapter
+[10:49:04] Xray Core: Xray запущен. Режим: TUN
+[10:49:04] Xray Core: 2026/11/25 10:49:04.338843 from tcp:127.0.0.1:54393 accepted tcp:ipwho.is:443 [socks-in -> proxy]
+[10:49:05] Xray Core: 2026/11/25 10:49:05.132916 from tcp:127.0.0.1:54395 accepted tcp:rdap.org:443 [socks-in -> proxy]
+[10:49:05] Xray Core: 2026/11/25 10:49:05.872966 from tcp:127.0.0.1:54396 accepted tcp:rdap.arin.net:443 [socks-in -> proxy]
+[10:49:07] Проверка выхода через Xray пройдена. Внешний IP: 139.84.250.53
+[10:49:07] Соединение активно.
+[10:49:07] Xray Core: 2026/11/25 10:49:07.667020 from 127.0.0.1:54397 accepted //www.youtube.com:443 [http-in -> proxy]
+[10:49:08] Xray Core: 2026/11/25 10:49:08.934285 from 127.0.0.1:54398 accepted //www.google.com:443 [http-in -> proxy]
+[10:49:18] Xray Core: 2026/11/25 10:49:18.589242 Timed out waiting for device query: Р’СЂРµРјСЏ РѕР¶РёРґР°РЅРёСЏ РѕРїРµСЂР°С†РёРё РёСЃС‚РµРєР»Рѕ. (Code 0x00000102)
+[10:49:18] Xray Core: 2026/11/25 10:49:18.589766 Failed to setup adapter (problem code: 0x1F, ntstatus: 0xC0000035): РќРµРІРѕР·РјРѕР¶РЅРѕ СЃРѕР·РґР°С‚СЊ С„Р°Р№Р», С‚Р°Рє РєР°Рє РѕРЅ СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚. (Code 0x000000B7)
+[10:49:18] Xray Core: не удалось выполнить операцию — start: app/proxyman/inbound: failed to start proxy > Cannot create a file when that file already exists.
+[10:49:18] Xray Core: Процесс Xray завершился. Код выхода: -1.
+[10:49:18] Ядро завершило работу. Системный прокси восстановлен.
+[10:49:23] Подготовка подключения: Johannesburg @BlockNetVPN
+[10:49:24] Xray Core: Xray 26.11.9 (Xray, Penetrates Everything.) 676eaf6 (go1.27.3 windows/amd64)
+[10:49:24] Xray Core: A unified platform for anti-censorship.
+[10:49:24] Xray Core: 2026/11/25 10:49:24.074715 [Info] infra/conf/serial: Reading config: &{Name:C:\Users\PC\AppData\Roaming\XrayHub\runtime\config.json Format:json}
+[10:49:24] Xray Core: 2026/11/25 10:49:24.075718 [Warning] common/errors: The feature gRPC transport (with unnecessary costs, etc.) is deprecated, not recommended for using and might be removed. Please migrate to XHTTP stream-up H2 as soon as possible.
+[10:49:24] Xray Core: 2026/11/25 10:49:24.076716 [Warning] common/errors: The feature Trojan (with no Flow, etc.) is deprecated, not recommended for using and might be removed. Please migrate to VLESS with Flow & Seed as soon as possible.
+[10:49:24] Xray Core: 2026/11/25 10:49:24.084723 Failed to find matching adapter name: Р­Р»РµРјРµРЅС‚ РЅРµ РЅР°Р№РґРµРЅ. (Code 0x00000490)
+[10:49:24] Xray Core: 2026/11/25 10:49:24.147735 Using existing driver 0.14
+[10:49:24] Xray Core: 2026/11/25 10:49:24.153052 Creating adapter
+[10:49:24] Xray Core: 2026/11/25 10:49:24.515576 from udp:10.88.0.1:137 accepted udp:10.88.0.3:137 [tun-in -> proxy]
+[10:49:24] Xray Core: 2026/11/25 10:49:24.535923 from udp:[fe80::efba:859e:c57d:eed8]:5353 accepted udp:[ff02::fb]:5353 [tun-in -> proxy]
+[10:49:24] Xray Core: 2026/11/25 10:49:24.535923 from udp:10.88.0.1:5353 accepted udp:224.0.0.251:5353 [tun-in -> proxy]
+[10:49:24] Xray Core: 2026/11/25 10:49:24.535923 from udp:[fe80::efba:859e:c57d:eed8]:56823 accepted udp:[ff02::1:3]:5355 [tun-in -> proxy]
+[10:49:24] Xray Core: 2026/11/25 10:49:24.535923 from udp:10.88.0.1:56823 accepted udp:224.0.0.252:5355 [tun-in -> proxy]
+[10:49:24] Xray Core: 2026/11/25 10:49:24.549747 from udp:[fe80::efba:859e:c57d:eed8]:51673 accepted udp:[ff02::1:3]:5355 [tun-in -> proxy]
+[10:49:24] Xray Core: 2026/11/25 10:49:24.549747 from udp:10.88.0.1:51673 accepted udp:224.0.0.252:5355 [tun-in -> proxy]
+[10:49:24] Xray Core: 2026/11/25 10:49:24.555018 from udp:10.88.0.1:51286 accepted udp:1.1.1.1:53 [tun-in -> dns-out]
+[10:49:24] Xray Core: 2026/11/25 10:49:24.555018 from DNS accepted udp:1.1.1.1:53 [xray.system.07346d0a-47fc-46ca-83e0-2d41ac57845b -> proxy]
+[10:49:24] Xray Core: 2026/11/25 10:49:24.558029 [Warning] core: Xray 26.11.9 started
+[10:49:24] Xray Core: 2026/11/25 10:49:24.761495 from udp:10.88.0.1:56338 accepted udp:1.1.1.1:53 [tun-in -> dns-out]
+[10:49:24] Xray Core: 2026/11/25 10:49:24.762604 from udp:10.88.0.1:54991 accepted udp:1.1.1.1:53 [tun-in -> dns-out]
+[10:49:24] Xray Core: Xray запущен. Режим: TUN
+[10:49:24] Xray Core: 2026/11/25 10:49:24.930319 from tcp:127.0.0.1:54407 accepted tcp:ipwho.is:443 [socks-in -> proxy]
+[10:49:25] Xray Core: 2026/11/25 10:49:24.999739 from udp:10.88.0.1:50340 accepted udp:1.1.1.1:53 [tun-in -> dns-out]
+[10:49:25] Xray Core: 2026/11/25 10:49:25.030014 from udp:10.88.0.1:53102 accepted udp:1.1.1.1:53 [tun-in -> dns-out]
+[10:49:25] Xray Core: 2026/11/25 10:49:25.239792 from tcp:10.88.0.1:61967 accepted tcp:1.1.1.1:53 [tun-in -> dns-out]
+[10:49:25] Xray Core: 2026/11/25 10:49:25.239792 from tcp:10.88.0.1:51049 accepted tcp:1.1.1.1:53 [tun-in -> dns-out]
+[10:49:25] Xray Core: 2026/11/25 10:49:25.270763 from tcp:10.88.0.1:61968 accepted tcp:95.100.109.68:80 [tun-in -> proxy]
+[10:49:25] Xray Core: 2026/11/25 10:49:25.410672 from udp:10.88.0.1:60950 accepted udp:1.1.1.1:53 [tun-in -> dns-out]
+[10:49:25] Xray Core: 2026/11/25 10:49:25.411231 from tcp:10.88.0.1:63389 accepted tcp:1.1.1.1:53 [tun-in -> dns-out]
+[10:49:25] Xray Core: 2026/11/25 10:49:25.418978 from tcp:127.0.0.1:63390 accepted tcp:rdap.org:443 [socks-in -> proxy]
+[10:49:25] Xray Core: 2026/11/25 10:49:25.612829 from udp:10.88.0.1:57969 accepted udp:1.1.1.1:53 [tun-in -> dns-out]
+[10:49:25] Xray Core: 2026/11/25 10:49:25.613379 from tcp:10.88.0.1:61219 accepted tcp:1.1.1.1:53 [tun-in -> dns-out]
+[10:49:25] Xray Core: 2026/11/25 10:49:25.807833 from udp:[fe80::efba:859e:c57d:eed8]:61751 accepted udp:[ff02::1:3]:5355 [tun-in -> proxy]
+[10:49:25] Xray Core: 2026/11/25 10:49:25.807833 from udp:10.88.0.1:61751 accepted udp:224.0.0.252:5355 [tun-in -> proxy]
+[10:49:25] Xray Core: 2026/11/25 10:49:25.814966 from udp:10.88.0.1:57894 accepted udp:1.1.1.1:53 [tun-in -> dns-out]
+[10:49:25] Xray Core: 2026/11/25 10:49:25.817918 from tcp:10.88.0.1:50979 accepted tcp:1.1.1.1:53 [tun-in -> dns-out]
+[10:49:25] Xray Core: 2026/11/25 10:49:25.829043 from udp:10.88.0.1:65042 accepted udp:1.1.1.1:53 [tun-in -> dns-out]
+[10:49:25] Xray Core: 2026/11/25 10:49:25.912040 from tcp:127.0.0.1:50980 accepted tcp:rdap.arin.net:443 [socks-in -> proxy]
+[10:49:25] Xray Core: 2026/11/25 10:49:25.974130 from udp:10.88.0.1:63427 accepted udp:1.1.1.1:53 [tun-in -> dns-out]
+[10:49:26] Xray Core: 2026/11/25 10:49:26.213934 from tcp:10.88.0.1:50981 accepted tcp:74.242.255.116:443 [tun-in -> proxy]
+[10:49:27] Проверка выхода через Xray пройдена. Внешний IP: 139.84.250.53
+[10:49:27] Соединение активно.
+[10:49:27] Xray Core: 2026/11/25 10:49:27.831213 from 127.0.0.1:50982 accepted //www.youtube.com:443 [http-in -> proxy]
+[10:49:28] Xray Core: 2026/11/25 10:49:28.679198 from 127.0.0.1:50983 accepted //www.google.com:443 [http-in -> proxy]
+[10:49:29] Xray Core: 2026/11/25 10:49:29.039357 from udp:10.88.0.1:63504 accepted udp:1.1.1.1:53 [tun-in -> dns-out]
+[10:49:29] Xray Core: 2026/11/25 10:49:29.330004 from udp:[fe80::efba:859e:c57d:eed8]:58452 accepted udp:[ff02::1:3]:5355 [tun-in -> proxy]
+[10:49:29] Xray Core: 2026/11/25 10:49:29.330004 from udp:10.88.0.1:58452 accepted udp:224.0.0.252:5355 [tun-in -> proxy]
+[10:49:29] Xray Core: 2026/11/25 10:49:29.334854 from tcp:10.88.0.1:50984 accepted tcp:74.242.255.116:443 [tun-in -> proxy]
+[10:49:29] Xray Core: 2026/11/25 10:49:29.941545 from udp:10.88.0.1:61797 accepted udp:1.1.1.1:53 [tun-in -> dns-out]
+[10:49:30] Xray Core: 2026/11/25 10:49:30.180254 from tcp:10.88.0.1:50985 accepted tcp:142.251.156.4:443 [tun-in -> proxy]
+[10:49:30] Xray Core: 2026/11/25 10:49:30.342556 from udp:[fe80::efba:859e:c57d:eed8]:57818 accepted udp:[ff02::1:3]:5355 [tun-in -> proxy]
+[10:49:30] Xray Core: 2026/11/25 10:49:30.342556 from udp:10.88.0.1:57818 accepted udp:224.0.0.252:5355 [tun-in -> proxy]
+[10:49:31] Xray Core: 2026/11/25 10:49:31.269212 from udp:10.88.0.1:62533 accepted udp:1.1.1.1:53 [tun-in -> dns-out]
+[10:49:31] Xray Core: 2026/11/25 10:49:31.507793 from tcp:10.88.0.1:50986 accepted tcp:173.194.128.129:443 [tun-in -> proxy]
+[10:49:40] Xray Core: 2026/11/25 10:49:40.127190 from udp:10.88.0.1:56313 accepted udp:1.1.1.1:53 [tun-in -> dns-out]
+[10:49:41] Xray Core: 2026/11/25 10:49:41.035770 from tcp:10.88.0.1:50988 accepted tcp:194.190.0.234:443 [tun-in -> proxy]
+[10:49:41] Xray Core: Процесс Xray завершился. Код выхода: -1.
+[10:49:41] Остановка Xray подтверждена. Соединение отключено.
