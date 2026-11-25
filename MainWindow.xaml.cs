@@ -50,6 +50,7 @@ public partial class MainWindow : Window
     private bool _disconnecting;
     private bool _closing;
     private bool _initializing = true;
+    private bool _isSavingSettings;
     private int _probeFailures;
     private Guid? _activeProfileId;
     private bool _subscriptionRefreshRunning;
@@ -134,8 +135,11 @@ public partial class MainWindow : Window
             if (_initializing || _closing || _shutdownInProgress) return;
             try
             {
+                var before = JsonSerializer.Serialize(_settings);
                 SaveSettingsFromUi();
-                AddLog("Изменения настроек и правил автоматически сохранены.");
+                var after = JsonSerializer.Serialize(_settings);
+                if (!string.Equals(before, after, StringComparison.Ordinal))
+                    AddLog("Изменения настроек и правил автоматически сохранены.");
             }
             catch (Exception ex)
             {
@@ -201,7 +205,7 @@ public partial class MainWindow : Window
 
     private void ScheduleSettingsAutosave()
     {
-        if (_initializing || _closing || _shutdownInProgress) return;
+        if (_initializing || _closing || _shutdownInProgress || _isSavingSettings) return;
         _settingsAutosaveTimer.Stop();
         _settingsAutosaveTimer.Start();
     }
@@ -248,6 +252,14 @@ public partial class MainWindow : Window
     }
 
     private void SaveSettingsFromUi()
+    {
+        if (_isSavingSettings) return;
+        _isSavingSettings = true;
+        try { SaveSettingsFromUiCore(); }
+        finally { _isSavingSettings = false; }
+    }
+
+    private void SaveSettingsFromUiCore()
     {
         if (!int.TryParse(SocksPortTextBox.Text, out var socksPort) || socksPort is < 1 or > 65535)
             throw new FormatException("Некорректный SOCKS-порт.");
