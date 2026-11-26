@@ -28,7 +28,7 @@ public sealed record ConnectionInfo(
 /// </summary>
 public sealed class ConnectionInfoService
 {
-    public async Task<ConnectionInfo> GetCurrentAsync(AppSettings settings, CancellationToken cancellationToken = default)
+    public async Task<ConnectionInfo> GetCurrentAsync(AppSettings settings, CancellationToken cancellationToken = default, bool includeNetwork = true)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(18));
@@ -65,7 +65,8 @@ public sealed class ConnectionInfoService
 
         var connection = GetObject(root, "connection");
         var timezone = GetObject(root, "timezone");
-        var network = await TryGetNetworkCidrAsync(client, ip, timeout.Token);
+        // The RDAP lookup is slow and only needed for the details panel, not for verifying the connection.
+        var network = includeNetwork ? await TryGetNetworkCidrAsync(client, ip, timeout.Token) : null;
 
         return new ConnectionInfo(
             Ip: ip,

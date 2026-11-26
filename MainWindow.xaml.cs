@@ -388,7 +388,6 @@ public partial class MainWindow : Window
                 try
                 {
                     xrayStarted = false;
-                    if (startupAttempt > 1) SetConnectionStatus($"Повторный запуск ({startupAttempt}/3)…", connected: false);
                     await _core.StartAsync(profile, _settings, tunnelMode);
                     xrayStarted = true;
 
@@ -402,7 +401,7 @@ public partial class MainWindow : Window
                     {
                         try
                         {
-                            egress = await _connectionInfoService.GetCurrentAsync(_settings, verificationTimeout.Token);
+                            egress = await _connectionInfoService.GetCurrentAsync(_settings, verificationTimeout.Token, includeNetwork: false);
                             break;
                         }
                         catch (Exception retryEx) when (attempt < 3 && IsConnectionRefused(retryEx)
@@ -715,12 +714,15 @@ public partial class MainWindow : Window
         using var limiter = new SemaphoreSlim(6, 6);
         try
         {
-            var results = await Task.WhenAll(_profiles.Select(async profile =>
+            // Adapter enumeration is slow on Windows; do it once, off the UI thread.
+            var localAddress = await Task.Run(() => FindPhysicalLocalAddress());
+            var profilesSnapshot = _profiles.ToList();
+            var results = await Task.WhenAll(profilesSnapshot.Select(async profile =>
             {
                 await limiter.WaitAsync();
                 try
                 {
-                    return (Profile: profile, Result: await MeasureServerLatencyAsync(profile));
+                    return (Profile: profile, Result: await Task.Run(() => MeasureServerLatencyAsync(profile, localAddress)));
                 }
                 finally { limiter.Release(); }
             }));
@@ -746,7 +748,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private static async Task<(string Display, long? Milliseconds, string Method)> MeasureServerLatencyAsync(ProxyProfile profile)
+    private static async Task<(string Display, long? Milliseconds, string Method)> MeasureServerLatencyAsync(ProxyProfile profile, IPAddress? local)
     {
         var (host, port) = ResolveProfileEndpoint(profile);
         if (string.IsNullOrWhiteSpace(host) || port is < 1 or > 65535)
@@ -764,20 +766,6 @@ public partial class MainWindow : Window
             var remote = addresses.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork);
             if (remote is null) return ("~", null, "unavailable");
 
-            var local = NetworkInterface.GetAllNetworkInterfaces()
-                .Where(n => n.OperationalStatus == OperationalStatus.Up
-                    && (n.NetworkInterfaceType == NetworkInterfaceType.Ethernet || n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211))
-                .SelectMany(n =>
-                {
-                    var hasGateway = n.GetIPProperties().GatewayAddresses.Any(g => g.Address.AddressFamily == AddressFamily.InterNetwork
-                        && !g.Address.Equals(IPAddress.Any));
-                    return hasGateway
-                        ? n.GetIPProperties().UnicastAddresses
-                            .Where(u => u.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(u.Address))
-                            .Select(u => u.Address)
-                        : Enumerable.Empty<IPAddress>();
-                })
-                .FirstOrDefault();
             if (local is null) return ("~", null, "unavailable");
 
             using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -792,6 +780,28 @@ public partial class MainWindow : Window
         {
             return ("~", null, "unavailable");
         }
+    }
+
+    private static IPAddress? FindPhysicalLocalAddress()
+    {
+        try
+        {
+            return NetworkInterface.GetAllNetworkInterfaces()
+                .Where(n => n.OperationalStatus == OperationalStatus.Up
+                    && (n.NetworkInterfaceType == NetworkInterfaceType.Ethernet || n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211))
+                .SelectMany(n =>
+                {
+                    var hasGateway = n.GetIPProperties().GatewayAddresses.Any(g => g.Address.AddressFamily == AddressFamily.InterNetwork
+                        && !g.Address.Equals(IPAddress.Any));
+                    return hasGateway
+                        ? n.GetIPProperties().UnicastAddresses
+                            .Where(u => u.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(u.Address))
+                            .Select(u => u.Address)
+                        : Enumerable.Empty<IPAddress>();
+                })
+                .FirstOrDefault();
+        }
+        catch { return null; }
     }
 
     private static (string Host, int Port) ResolveProfileEndpoint(ProxyProfile profile)

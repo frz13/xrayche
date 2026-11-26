@@ -75,7 +75,9 @@ public sealed class XrayCoreService : IAsyncDisposable
             if (!process.Start()) throw new InvalidOperationException("Не удалось запустить xray.exe.");
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
-            await Task.Delay(900, cancellationToken);
+            // Early-exit window: leave as soon as Xray reports it started (or died), otherwise after 900 ms.
+            for (var waited = 0; waited < 900 && !process.HasExited && !startedSignal.Task.IsCompleted; waited += 50)
+                await Task.Delay(50, cancellationToken);
             if (process.HasExited)
             {
                 var code = process.ExitCode;
@@ -99,7 +101,7 @@ public sealed class XrayCoreService : IAsyncDisposable
                     cancellationToken.ThrowIfCancellationRequested();
                     if (process.HasExited) break;
                     if (startedSignal.Task.IsCompleted || IsTunAdapterUp(tunName, tunIp)) { ready = true; break; }
-                    await Task.Delay(250, cancellationToken);
+                    await Task.Delay(100, cancellationToken);
                 }
 
                 if (!ready)
@@ -164,8 +166,8 @@ public sealed class XrayCoreService : IAsyncDisposable
         return false;
     }
 
-    // True until a cleanup has run in this session, and again after any failed TUN start.
-    private bool _tunDirty = true;
+    // Set after a failed TUN start, so the next start cleans up leftovers first.
+    private bool _tunDirty;
 
     private async Task PrepareTunAsync(string xrayPath, string tunName, CancellationToken token)
     {
