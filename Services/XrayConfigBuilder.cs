@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using XrayHub.Models;
@@ -379,18 +379,17 @@ public static class XrayConfigBuilder
             if (string.Equals(normalized, "domain:youtube.com", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(normalized, "domain:www.youtube.com", StringComparison.OrdinalIgnoreCase))
             {
-                // A YouTube page, its player/API, thumbnails and video segments are
-                // served from different hostnames. Route the complete first-party set
-                // together so a Direct fallback cannot send only part of playback direct.
+                if (string.Equals(normalized, "domain:www.youtube.com", StringComparison.OrdinalIgnoreCase)
+                    && !result.Contains("domain:youtube.com", StringComparer.OrdinalIgnoreCase))
+                    result.Add("domain:youtube.com");
+
                 foreach (var related in new[]
                 {
-                    "domain:youtube.com",
                     "domain:youtu.be",
                     "domain:googlevideo.com",
                     "domain:ytimg.com",
                     "domain:youtubei.googleapis.com",
                     "domain:youtube.googleapis.com",
-                    "domain:youtubeembeddedplayer.googleapis.com",
                     "domain:youtube-nocookie.com",
                     "domain:ggpht.com"
                 })
@@ -426,16 +425,6 @@ public static class XrayConfigBuilder
                 ["tag"] = "socks-in", ["listen"] = "127.0.0.1", ["port"] = settings.SocksPort,
                 ["protocol"] = "socks", ["settings"] = BuildSocksSettings(settings)
             });
-        // Imported profiles may define HTTP/SOCKS/TUN inbounds without sniffing.
-        // Without TLS sniffing Xray only sees destination IPs and cannot match
-        // hostname-based user routes (notably youtube.com/googlevideo.com).
-        foreach (var inbound in inbounds.OfType<JsonObject>())
-        {
-            var protocol = inbound["protocol"]?.GetValue<string>()?.ToLowerInvariant();
-            if (protocol is "http" or "socks" or "tun")
-                inbound["sniffing"] = BuildSniffing();
-        }
-
         var xrayHubSocks = inbounds.OfType<JsonObject>().FirstOrDefault(o => o["tag"]?.GetValue<string>() == "socks-in");
         if (xrayHubSocks is not null)
         {
