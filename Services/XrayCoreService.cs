@@ -199,12 +199,13 @@ public sealed class XrayCoreService : IAsyncDisposable
             if (!IsSafeAdapterName(tunName)) return;
 
             LogReceived?.Invoke("Очистка возможных остатков TUN-адаптера перед запуском…");
-            var script =
+            const string scriptTemplate =
                 "$ErrorActionPreference='SilentlyContinue';" +
-                $"$a=@(Get-NetAdapter -Name '{tunName}' -IncludeHidden);" +
+                "$a=@(Get-NetAdapter -Name '__TUN__' -IncludeHidden);" +
                 "foreach($x in $a){ if($x.PnPDeviceID){ pnputil /remove-device $x.PnPDeviceID | Out-Null } };" +
                 "if($a.Count -gt 0){ Start-Sleep -Milliseconds 800;" +
-                $" $b=@(Get-NetAdapter -Name '{tunName}' -IncludeHidden); if($b.Count -gt 0){ $b | Remove-NetAdapter -Confirm:$false } }";
+                " $b=@(Get-NetAdapter -Name '__TUN__' -IncludeHidden); if($b.Count -gt 0){ $b | Remove-NetAdapter -Confirm:$false } }";
+            var script = scriptTemplate.Replace("__TUN__", tunName);
             await RunPowerShellAsync(script, TimeSpan.FromSeconds(12), token);
             _tunDirty = false;
             if (visible) await Task.Delay(1000, token);
