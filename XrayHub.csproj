@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -10,7 +10,7 @@
     <AssemblyName>XrayHub</AssemblyName>
     <ApplicationIcon>Assets\XrayHub.ico</ApplicationIcon>
     <RootNamespace>XrayHub</RootNamespace>
-    <Version>0.3.18</Version>
+    <Version>0.3.19</Version>
     <Product>XrayHub</Product>
     <Description>Windows proxy and tunnel client built around Xray Core.</Description>
   </PropertyGroup>

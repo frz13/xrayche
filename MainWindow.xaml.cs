@@ -16,6 +16,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Navigation;
+using System.Windows.Input;
 using System.Windows.Threading;
 using XrayHub.Models;
 using XrayHub.Services;
@@ -2876,7 +2877,7 @@ public partial class MainWindow : Window
         _baseTrayIcon = null;
         _connectionInfoCancellation?.Cancel();
         _shutdownComplete = true;
-        Dispatcher.BeginInvoke(new Action(Close));
+        _ = Dispatcher.BeginInvoke(new Action(Close));
     }
 
 }
