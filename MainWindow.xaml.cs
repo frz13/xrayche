@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Net.Http;
@@ -52,6 +52,7 @@ public partial class MainWindow : Window
     private bool _closing;
     private bool _initializing = true;
     private bool _isSavingSettings;
+    private bool _routingRuleEditing;
     private int _probeFailures;
     private Guid? _activeProfileId;
     private bool _subscriptionRefreshRunning;
@@ -134,6 +135,8 @@ public partial class MainWindow : Window
         {
             _settingsAutosaveTimer.Stop();
             if (_initializing || _closing || _shutdownInProgress) return;
+            // Never touch the UI while the user is typing in the rules grid: retry later.
+            if (_routingRuleEditing) { _settingsAutosaveTimer.Start(); return; }
             try
             {
                 var before = JsonSerializer.Serialize(_settings);
@@ -150,8 +153,12 @@ public partial class MainWindow : Window
         };
         RegisterSettingsAutosaveHandlers();
         _routingRules.CollectionChanged += (_, _) => ScheduleSettingsAutosave();
+        RoutingRulesGrid.BeginningEdit += (_, _) => _routingRuleEditing = true;
         RoutingRulesGrid.CellEditEnding += (_, _) =>
+        {
+            _routingRuleEditing = false;
             Dispatcher.BeginInvoke(new Action(ScheduleSettingsAutosave), DispatcherPriority.Background);
+        };
 
         _elapsedTimer.Tick += (_, _) => UpdateElapsed();
         _healthTimer.Tick += async (_, _) => await RunHealthProbeAsync();
@@ -262,6 +269,8 @@ public partial class MainWindow : Window
 
     private void SaveSettingsFromUiCore()
     {
+        var prevTheme = _settings.Theme;
+        var prevLanguage = _settings.Language;
         if (!int.TryParse(SocksPortTextBox.Text, out var socksPort) || socksPort is < 1 or > 65535)
             throw new FormatException("Некорректный SOCKS-порт.");
         if (!int.TryParse(HttpPortTextBox.Text, out var httpPort) || httpPort is < 1 or > 65535)
@@ -300,8 +309,8 @@ public partial class MainWindow : Window
         _settings.SocksAuthentication = SocksAuthToggle.IsChecked == true;
         _settings.SocksUsername = SocksUsernameTextBox.Text.Trim();
         _settings.SocksPassword = socksPassword;
-        SocksPasswordBox.Password = socksPassword;
-        SocksPasswordVisibleTextBox.Text = socksPassword;
+        if (SocksPasswordBox.Password != socksPassword) SocksPasswordBox.Password = socksPassword;
+        if (SocksPasswordVisibleTextBox.Text != socksPassword) SocksPasswordVisibleTextBox.Text = socksPassword;
         _settings.MuxEnabled = MuxEnabledToggle.IsChecked == true;
         _settings.MuxTcpConcurrency = muxTcp;
         _settings.MuxXudpConcurrency = muxXudp;
@@ -330,15 +339,22 @@ public partial class MainWindow : Window
         }
         _settings.RoutingRules = validRoutingRules;
         _settings.DefaultRoute = DefaultRouteCombo.SelectedValue?.ToString() ?? "proxy";
-        ModeCombo.SelectedIndex = _settings.Mode.Contains("Туннель", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
-        DnsServersTextBox.Text = dnsValue;
+        var wantedModeIndex = _settings.Mode.Contains("Туннель", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        if (ModeCombo.SelectedIndex != wantedModeIndex) ModeCombo.SelectedIndex = wantedModeIndex;
+        if (DnsServersTextBox.Text != dnsValue) DnsServersTextBox.Text = dnsValue;
         DnsEditButton.Content = L("По умолчанию");
         _store.SaveSettings(_settings);
         ApplyAutoStartRegistration();
         ConfigureSubscriptionTimer();
-        ApplyThemePalette();
-        ApplyUiLanguage();
-        UpdateTrayMenuLanguage();
+        // Re-applying the palette / translating the whole tree resets focus and cancels
+        // DataGrid editing, so do it only when theme or language really changed.
+        if (!string.Equals(prevTheme, _settings.Theme, StringComparison.Ordinal))
+            ApplyThemePalette();
+        if (!string.Equals(prevLanguage, _settings.Language, StringComparison.Ordinal))
+        {
+            ApplyUiLanguage();
+            UpdateTrayMenuLanguage();
+        }
     }
 
     private static bool IsValidInterfaceAddress(string value)
@@ -723,19 +739,26 @@ public partial class MainWindow : Window
                 await limiter.WaitAsync();
                 try
                 {
-                    return (Profile: profile, Result: await Task.Run(() => MeasureServerLatencyAsync(profile, localAddress)));
+                    var measured = await Task.Run(() => MeasureServerLatencyAsync(profile, localAddress));
+                    // Continuation runs on the UI thread: stop this row's spinner right away.
+                    profile.PingDisplay = measured.Display;
+                    if (measured.Milliseconds.HasValue)
+                        AddLog($"Задержка {profile.DisplayName}: {measured.Display} ({measured.Method}).");
+                    else
+                        AddLog($"TCP-проверка не прошла: {profile.DisplayName}.");
+                    return (Profile: profile, Result: measured);
+                }
+                catch
+                {
+                    profile.PingDisplay = "~";
+                    (string Display, long? Milliseconds, string Method) failed = ("~", null, "unavailable");
+                    return (Profile: profile, Result: failed);
                 }
                 finally { limiter.Release(); }
             }));
 
-            foreach (var result in results)
-            {
-                result.Profile.PingDisplay = result.Result.Display;
-                if (result.Result.Milliseconds.HasValue)
-                    AddLog($"Задержка {result.Profile.DisplayName}: {result.Result.Display} ({result.Result.Method}).");
-                else
-                    AddLog($"TCP-проверка не прошла: {result.Profile.DisplayName}.");
-            }
+            // Let the spinners disappear and the layout settle before the notice appears.
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
 
             var success = results.Count(x => x.Result.Milliseconds.HasValue);
             ShowNotice(
