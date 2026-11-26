@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Net.Http;
@@ -949,6 +949,8 @@ public partial class MainWindow : Window
 
     private static IEnumerable<T> FindVisualChildren<T>(DependencyObject parent) where T : DependencyObject
     {
+        if (parent is not Visual && parent is not System.Windows.Media.Media3D.Visual3D)
+            yield break;
         var childCount = VisualTreeHelper.GetChildrenCount(parent);
         for (var i = 0; i < childCount; i++)
         {
@@ -960,6 +962,8 @@ public partial class MainWindow : Window
 
     private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
     {
+        if (parent is not Visual && parent is not System.Windows.Media.Media3D.Visual3D)
+            return null;
         var childCount = VisualTreeHelper.GetChildrenCount(parent);
         for (var i = 0; i < childCount; i++)
         {
@@ -1203,73 +1207,74 @@ public partial class MainWindow : Window
 
     private void AddRoutingRule_Click(object sender, RoutedEventArgs e)
     {
-        var rule = new RoutingRule();
-        _addingRoutingRule = true;
-        try { _routingRules.Add(rule); }
-        finally { _addingRoutingRule = false; }
-
-        RoutingRulesGrid.SelectedItem = rule;
-        RoutingRulesGrid.ScrollIntoView(rule);
-        var domainColumn = RoutingRulesGrid.Columns[0];
-
-        // Wait for the row container to exist, then enter cell edit mode. The
-        // editor itself is focused on a later dispatcher pass after its template loads.
-        Dispatcher.BeginInvoke(new Action(() =>
+        // Keep the click handler defensive: a visual-tree lookup failure must never
+        // take down the whole WPF process.
+        try
         {
-            RoutingRulesGrid.UpdateLayout();
-            var row = RoutingRulesGrid.ItemContainerGenerator.ContainerFromItem(rule) as DataGridRow;
-            if (row is null)
-            {
-                RoutingRulesGrid.ScrollIntoView(rule);
-                RoutingRulesGrid.UpdateLayout();
-                row = RoutingRulesGrid.ItemContainerGenerator.ContainerFromItem(rule) as DataGridRow;
-            }
-            if (row is null) return;
+            var rule = new RoutingRule();
+            _addingRoutingRule = true;
+            try { _routingRules.Add(rule); }
+            finally { _addingRoutingRule = false; }
 
             RoutingRulesGrid.SelectedItem = rule;
-            RoutingRulesGrid.CurrentCell = new DataGridCellInfo(rule, domainColumn);
-            RoutingRulesGrid.Focus();
-            RoutingRulesGrid.BeginEdit();
-            FocusRoutingDomainEditor(rule, domainColumn, 6);
-        }), DispatcherPriority.Loaded);
-    }
+            RoutingRulesGrid.ScrollIntoView(rule);
 
-    private void FocusRoutingDomainEditor(RoutingRule rule, DataGridColumn domainColumn, int attemptsRemaining)
-    {
-        Dispatcher.BeginInvoke(new Action(() =>
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try
+                {
+                    if (!IsLoaded || !_routingRules.Contains(rule) || RoutingRulesGrid.Columns.Count == 0)
+                        return;
+
+                    RoutingRulesGrid.UpdateLayout();
+                    var domainColumn = RoutingRulesGrid.Columns[0];
+                    RoutingRulesGrid.SelectedItem = rule;
+                    RoutingRulesGrid.CurrentCell = new DataGridCellInfo(rule, domainColumn);
+                    RoutingRulesGrid.BeginEdit();
+
+                    // Let the DataGrid create the editing template before focusing its TextBox.
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        try
+                        {
+                            if (!_routingRules.Contains(rule)) return;
+                            RoutingRulesGrid.UpdateLayout();
+                            var row = RoutingRulesGrid.ItemContainerGenerator.ContainerFromItem(rule) as DataGridRow;
+                            if (row is null) return;
+                            var cell = FindVisualChildren<DataGridCell>(row)
+                                .FirstOrDefault(c => c.Column == domainColumn);
+                            if (cell is null) return;
+                            if (!cell.IsEditing)
+                            {
+                                RoutingRulesGrid.CurrentCell = new DataGridCellInfo(rule, domainColumn);
+                                RoutingRulesGrid.BeginEdit();
+                                return;
+                            }
+
+                            var editor = FindVisualChild<TextBox>(cell);
+                            if (editor is null) return;
+                            editor.Focus();
+                            Keyboard.Focus(editor);
+                            editor.CaretIndex = editor.Text.Length;
+                        }
+                        catch (Exception ex)
+                        {
+                            AddLog("Не удалось автоматически установить курсор в новое правило: " + ex.Message);
+                        }
+                    }), DispatcherPriority.Input);
+                }
+                catch (Exception ex)
+                {
+                    AddLog("Не удалось открыть редактор нового правила: " + ex.Message);
+                }
+            }), DispatcherPriority.Loaded);
+        }
+        catch (Exception ex)
         {
-            RoutingRulesGrid.UpdateLayout();
-            var row = RoutingRulesGrid.ItemContainerGenerator.ContainerFromItem(rule) as DataGridRow;
-            var cell = row is null ? null : FindVisualChildren<DataGridCell>(row)
-                .FirstOrDefault(c => c.Column == domainColumn);
-            if (cell is null)
-            {
-                if (attemptsRemaining > 0)
-                    FocusRoutingDomainEditor(rule, domainColumn, attemptsRemaining - 1);
-                return;
-            }
-
-            if (!cell.IsEditing)
-            {
-                RoutingRulesGrid.CurrentCell = new DataGridCellInfo(rule, domainColumn);
-                RoutingRulesGrid.BeginEdit();
-                if (attemptsRemaining > 0)
-                    FocusRoutingDomainEditor(rule, domainColumn, attemptsRemaining - 1);
-                return;
-            }
-
-            var editor = FindVisualChild<TextBox>(cell);
-            if (editor is null)
-            {
-                if (attemptsRemaining > 0)
-                    FocusRoutingDomainEditor(rule, domainColumn, attemptsRemaining - 1);
-                return;
-            }
-
-            editor.Focus();
-            Keyboard.Focus(editor);
-            editor.CaretIndex = editor.Text.Length;
-        }), DispatcherPriority.ContextIdle);
+            _addingRoutingRule = false;
+            AddLog("Ошибка добавления правила маршрутизации: " + ex);
+            ShowNotice("Не удалось добавить правило. Подробности записаны в журнал.", "Маршрутизация", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void RemoveRoutingRule_Click(object sender, RoutedEventArgs e)

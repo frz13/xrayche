@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using XrayHub.Models;
@@ -379,17 +379,18 @@ public static class XrayConfigBuilder
             if (string.Equals(normalized, "domain:youtube.com", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(normalized, "domain:www.youtube.com", StringComparison.OrdinalIgnoreCase))
             {
-                if (string.Equals(normalized, "domain:www.youtube.com", StringComparison.OrdinalIgnoreCase)
-                    && !result.Contains("domain:youtube.com", StringComparer.OrdinalIgnoreCase))
-                    result.Add("domain:youtube.com");
-
+                // A YouTube page, its player/API, thumbnails and video segments are
+                // served from different hostnames. Route the complete first-party set
+                // together so a Direct fallback cannot send only part of playback direct.
                 foreach (var related in new[]
                 {
+                    "domain:youtube.com",
                     "domain:youtu.be",
                     "domain:googlevideo.com",
                     "domain:ytimg.com",
                     "domain:youtubei.googleapis.com",
                     "domain:youtube.googleapis.com",
+                    "domain:youtubeembeddedplayer.googleapis.com",
                     "domain:youtube-nocookie.com",
                     "domain:ggpht.com"
                 })
