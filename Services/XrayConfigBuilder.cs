@@ -425,6 +425,16 @@ public static class XrayConfigBuilder
                 ["tag"] = "socks-in", ["listen"] = "127.0.0.1", ["port"] = settings.SocksPort,
                 ["protocol"] = "socks", ["settings"] = BuildSocksSettings(settings)
             });
+        // Imported profiles may define HTTP/SOCKS/TUN inbounds without sniffing.
+        // Without TLS sniffing Xray only sees destination IPs and cannot match
+        // hostname-based user routes (notably youtube.com/googlevideo.com).
+        foreach (var inbound in inbounds.OfType<JsonObject>())
+        {
+            var protocol = inbound["protocol"]?.GetValue<string>()?.ToLowerInvariant();
+            if (protocol is "http" or "socks" or "tun")
+                inbound["sniffing"] = BuildSniffing();
+        }
+
         var xrayHubSocks = inbounds.OfType<JsonObject>().FirstOrDefault(o => o["tag"]?.GetValue<string>() == "socks-in");
         if (xrayHubSocks is not null)
         {

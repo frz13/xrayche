@@ -647,7 +647,7 @@
                                               HeadersVisibility="Column" GridLinesVisibility="Horizontal" RowHeaderWidth="0"
                                               Height="250" MinHeight="220" MaxHeight="360" Background="{DynamicResource InputBg}" BorderBrush="{DynamicResource Line}"
                                               BorderThickness="1" AlternatingRowBackground="{DynamicResource Panel2}" CanUserSortColumns="False"
-                                              SelectionMode="Single" SelectionUnit="FullRow" FontSize="11"
+                                              SelectionMode="Single" SelectionUnit="Cell" FontSize="11"
                                               ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                         <DataGrid.Columns>
                                             <DataGridTemplateColumn Header="Домен" Width="2.2*">

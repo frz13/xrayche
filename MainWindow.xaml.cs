@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Net.Http;
@@ -52,6 +52,7 @@ public partial class MainWindow : Window
     private bool _closing;
     private bool _initializing = true;
     private bool _isSavingSettings;
+    private bool _addingRoutingRule;
     private int _probeFailures;
     private Guid? _activeProfileId;
     private bool _subscriptionRefreshRunning;
@@ -149,7 +150,12 @@ public partial class MainWindow : Window
             }
         };
         RegisterSettingsAutosaveHandlers();
-        _routingRules.CollectionChanged += (_, _) => ScheduleSettingsAutosave();
+        _routingRules.CollectionChanged += (_, _) =>
+        {
+            // A newly inserted empty row is an editing surface, not a settings change.
+            // Autosaving it would rebuild localized UI shortly after insertion and steal focus.
+            if (!_addingRoutingRule) ScheduleSettingsAutosave();
+        };
         RoutingRulesGrid.CellEditEnding += (_, _) =>
             Dispatcher.BeginInvoke(new Action(ScheduleSettingsAutosave), DispatcherPriority.Background);
 
@@ -1198,42 +1204,72 @@ public partial class MainWindow : Window
     private void AddRoutingRule_Click(object sender, RoutedEventArgs e)
     {
         var rule = new RoutingRule();
-        _routingRules.Add(rule);
+        _addingRoutingRule = true;
+        try { _routingRules.Add(rule); }
+        finally { _addingRoutingRule = false; }
+
         RoutingRulesGrid.SelectedItem = rule;
         RoutingRulesGrid.ScrollIntoView(rule);
+        var domainColumn = RoutingRulesGrid.Columns[0];
 
-        // Wait until the new row is generated and laid out before beginning edit.
+        // Wait for the row container to exist, then enter cell edit mode. The
+        // editor itself is focused on a later dispatcher pass after its template loads.
         Dispatcher.BeginInvoke(new Action(() =>
         {
+            RoutingRulesGrid.UpdateLayout();
             var row = RoutingRulesGrid.ItemContainerGenerator.ContainerFromItem(rule) as DataGridRow;
             if (row is null)
             {
+                RoutingRulesGrid.ScrollIntoView(rule);
                 RoutingRulesGrid.UpdateLayout();
                 row = RoutingRulesGrid.ItemContainerGenerator.ContainerFromItem(rule) as DataGridRow;
             }
             if (row is null) return;
 
-            var domainColumn = RoutingRulesGrid.Columns[0];
+            RoutingRulesGrid.SelectedItem = rule;
             RoutingRulesGrid.CurrentCell = new DataGridCellInfo(rule, domainColumn);
             RoutingRulesGrid.Focus();
             RoutingRulesGrid.BeginEdit();
-
-            // CellEditingTemplate is applied on a later layout pass. Focus the editor
-            // after that pass so DataGrid does not immediately restore row focus.
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                RoutingRulesGrid.UpdateLayout();
-                row = RoutingRulesGrid.ItemContainerGenerator.ContainerFromItem(rule) as DataGridRow;
-                if (row is null) return;
-                var cell = FindVisualChildren<DataGridCell>(row)
-                    .FirstOrDefault(c => c.Column == domainColumn);
-                var editor = cell is null ? null : FindVisualChild<TextBox>(cell);
-                if (editor is null) return;
-                editor.Focus();
-                editor.SelectAll();
-                Keyboard.Focus(editor);
-            }), DispatcherPriority.ContextIdle);
+            FocusRoutingDomainEditor(rule, domainColumn, 6);
         }), DispatcherPriority.Loaded);
+    }
+
+    private void FocusRoutingDomainEditor(RoutingRule rule, DataGridColumn domainColumn, int attemptsRemaining)
+    {
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            RoutingRulesGrid.UpdateLayout();
+            var row = RoutingRulesGrid.ItemContainerGenerator.ContainerFromItem(rule) as DataGridRow;
+            var cell = row is null ? null : FindVisualChildren<DataGridCell>(row)
+                .FirstOrDefault(c => c.Column == domainColumn);
+            if (cell is null)
+            {
+                if (attemptsRemaining > 0)
+                    FocusRoutingDomainEditor(rule, domainColumn, attemptsRemaining - 1);
+                return;
+            }
+
+            if (!cell.IsEditing)
+            {
+                RoutingRulesGrid.CurrentCell = new DataGridCellInfo(rule, domainColumn);
+                RoutingRulesGrid.BeginEdit();
+                if (attemptsRemaining > 0)
+                    FocusRoutingDomainEditor(rule, domainColumn, attemptsRemaining - 1);
+                return;
+            }
+
+            var editor = FindVisualChild<TextBox>(cell);
+            if (editor is null)
+            {
+                if (attemptsRemaining > 0)
+                    FocusRoutingDomainEditor(rule, domainColumn, attemptsRemaining - 1);
+                return;
+            }
+
+            editor.Focus();
+            Keyboard.Focus(editor);
+            editor.CaretIndex = editor.Text.Length;
+        }), DispatcherPriority.ContextIdle);
     }
 
     private void RemoveRoutingRule_Click(object sender, RoutedEventArgs e)
