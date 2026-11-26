@@ -33,17 +33,8 @@ public sealed class ConnectionInfoService
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(18));
 
-        var handler = new SocketsHttpHandler
-        {
-            UseProxy = false,
-            AllowAutoRedirect = true,
-            ConnectTimeout = TimeSpan.FromSeconds(8),
-            PooledConnectionLifetime = TimeSpan.FromMinutes(1),
-            ConnectCallback = (context, token) => ConnectThroughSocksAsync(context, settings, token)
-        };
-
-        using var client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("XrayHub/0.3.5");
+        using var client = CreateSocksHttpClient(settings, TimeSpan.FromSeconds(8));
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("XrayHub/0.3.16");
 
         using var geoResponse = await client.GetAsync("https://ipwho.is/", HttpCompletionOption.ResponseHeadersRead, timeout.Token);
         geoResponse.EnsureSuccessStatusCode();
@@ -82,6 +73,70 @@ public sealed class ConnectionInfoService
             Isp: ValueOrDash(GetString(connection, "isp")),
             Asn: ValueOrDash(GetScalarString(connection, "asn")),
             AccuracyRadius: GetNumber(root, "accuracy_radius"));
+    }
+
+    /// <summary>
+    /// Fast startup check. It only asks for the public egress IP through the local
+    /// SOCKS5 inbound; geo and RDAP lookups are intentionally kept for the details view.
+    /// Two independent IP-echo endpoints are raced so a slow/unavailable provider
+    /// does not hold up connection establishment.
+    /// </summary>
+    public async Task<string> GetCurrentIpAsync(AppSettings settings, CancellationToken cancellationToken = default)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(7));
+        using var client = CreateSocksHttpClient(settings, TimeSpan.FromSeconds(4));
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("XrayHub/0.3.16");
+
+        var pending = new List<Task<string?>>
+        {
+            TryGetPublicIpAsync(client, "https://api.ipify.org/", timeout.Token),
+            TryGetPublicIpAsync(client, "https://icanhazip.com/", timeout.Token)
+        };
+
+        while (pending.Count > 0)
+        {
+            var completed = await Task.WhenAny(pending).WaitAsync(timeout.Token);
+            pending.Remove(completed);
+            var ip = await completed;
+            if (!string.IsNullOrWhiteSpace(ip))
+            {
+                timeout.Cancel();
+                return ip;
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        throw new InvalidOperationException("Не удалось быстро получить внешний IP через Xray.");
+    }
+
+    private static async Task<string?> TryGetPublicIpAsync(HttpClient client, string endpoint, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await client.GetAsync(endpoint, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            var value = (await response.Content.ReadAsStringAsync(cancellationToken)).Trim();
+            return IPAddress.TryParse(value, out var parsed) ? parsed.ToString() : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static HttpClient CreateSocksHttpClient(AppSettings settings, TimeSpan connectTimeout)
+    {
+        var handler = new SocketsHttpHandler
+        {
+            UseProxy = false,
+            AllowAutoRedirect = true,
+            ConnectTimeout = connectTimeout,
+            PooledConnectionLifetime = TimeSpan.FromMinutes(1),
+            MaxConnectionsPerServer = 2,
+            ConnectCallback = (context, token) => ConnectThroughSocksAsync(context, settings, token)
+        };
+        return new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
     }
 
     private static async Task<string> TryGetNetworkCidrAsync(HttpClient client, string ip, CancellationToken cancellationToken)

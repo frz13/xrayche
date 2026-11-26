@@ -303,6 +303,18 @@
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding PingDisplay}" Value="…">
                                             <Setter Property="Visibility" Value="Visible" />
+                                            <DataTrigger.EnterActions>
+                                                <BeginStoryboard x:Name="PingSpinnerStoryboard">
+                                                    <Storyboard RepeatBehavior="Forever">
+                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                                         From="0" To="360" Duration="0:0:0.7"
+                                                                         AccelerationRatio="0" DecelerationRatio="0" />
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </DataTrigger.EnterActions>
+                                            <DataTrigger.ExitActions>
+                                                <RemoveStoryboard BeginStoryboardName="PingSpinnerStoryboard" />
+                                            </DataTrigger.ExitActions>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -310,16 +322,6 @@
                             <Grid.RenderTransform>
                                 <RotateTransform Angle="0" />
                             </Grid.RenderTransform>
-                            <Grid.Triggers>
-                                <EventTrigger RoutedEvent="FrameworkElement.Loaded">
-                                    <BeginStoryboard>
-                                        <Storyboard RepeatBehavior="Forever">
-                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
-                                                             From="0" To="360" Duration="0:0:0.85" />
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </EventTrigger>
-                            </Grid.Triggers>
                             <Ellipse Width="13" Height="13" Stroke="#334B86C5" StrokeThickness="2" />
                             <Path Data="M 7,1 A 6,6 0 1 1 1,7" Width="14" Height="14"
                                   StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
@@ -592,7 +594,7 @@
                                 </StackPanel>
                             </Border>
 
-                            <Border Style="{StaticResource CardBorder}" Margin="0,0,0,10">
+                            <Border Style="{StaticResource CardBorder}" Margin="0,0,0,10" Visibility="Collapsed">
                                 <StackPanel>
                                     <TextBlock Text="Проверка доступности" FontSize="13" FontWeight="SemiBold" />
                                     <Grid Margin="0,8,0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Проверять YouTube и Google во время подключения" VerticalAlignment="Center"/><ToggleButton x:Name="YoutubeProbeTrafficCheckBox" Grid.Column="1" Style="{StaticResource GradientSwitch}" /></Grid>

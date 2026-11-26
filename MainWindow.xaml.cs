@@ -381,7 +381,7 @@ public partial class MainWindow : Window
             // egress verification, clean up the exited process, allow the adapter
             // driver to settle, and retry the whole startup once. Do not retry while
             // Xray is still running: that would hide ordinary proxy/network failures.
-            ConnectionInfo? egress = null;
+            string? egressIp = null;
             var xrayStarted = false;
             for (var startupAttempt = 1; startupAttempt <= 3; startupAttempt++)
             {
@@ -396,19 +396,19 @@ public partial class MainWindow : Window
 
                     // Do not report success merely because xray.exe started.
                     // Verify the public egress through the local SOCKS inbound.
-                    using var verificationTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(28));
+                    using var verificationTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
                     for (var attempt = 1; ; attempt++)
                     {
                         try
                         {
-                            egress = await _connectionInfoService.GetCurrentAsync(_settings, verificationTimeout.Token, includeNetwork: false);
+                            egressIp = await _connectionInfoService.GetCurrentIpAsync(_settings, verificationTimeout.Token);
                             break;
                         }
                         catch (Exception retryEx) when (attempt < 3 && IsConnectionRefused(retryEx)
                             && !verificationTimeout.IsCancellationRequested)
                         {
                             AddLog($"Локальный SOCKS ещё запускается; повторная проверка {attempt + 1}/3.");
-                            await Task.Delay(900, verificationTimeout.Token);
+                            await Task.Delay(450, verificationTimeout.Token);
                         }
                     }
 
@@ -425,10 +425,10 @@ public partial class MainWindow : Window
                 }
             }
 
-            if (egress is null)
+            if (string.IsNullOrWhiteSpace(egressIp))
                 throw new InvalidOperationException("Не удалось подтвердить внешний IP через Xray.");
 
-            AddLog($"Проверка выхода через Xray пройдена. Внешний IP: {egress.Ip}");
+            AddLog($"Проверка выхода через Xray пройдена. Внешний IP: {egressIp}");
 
             _connected = true;
             UpdateTrayState();

@@ -294,11 +294,11 @@ public static class XrayConfigBuilder
 
         foreach (var rule in settings.RoutingRules ?? [])
         {
-            var domains = SplitRuleValues(rule.Domain);
+            var domains = ExpandRoutingDomains(rule.Domain);
             if (domains.Count == 0) continue;
 
             var domainArray = new JsonArray();
-            foreach (var domain in domains) domainArray.Add(NormalizeDomainRule(domain));
+            foreach (var domain in domains) domainArray.Add(domain);
             var selectors = new JsonObject
             {
                 ["type"] = "field",
@@ -362,6 +362,44 @@ public static class XrayConfigBuilder
         var trimmed = value.Trim();
         if (trimmed.Contains(':')) return trimmed;
         return "domain:" + trimmed;
+    }
+
+    private static List<string> ExpandRoutingDomains(string? value)
+    {
+        var result = new List<string>();
+        foreach (var item in SplitRuleValues(value))
+        {
+            var normalized = NormalizeDomainRule(item);
+            if (!result.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+                result.Add(normalized);
+
+            // A YouTube rule must cover its separate video and image CDNs too.
+            // Otherwise the page can match the rule while googlevideo/ytimg traffic
+            // silently follows the default route (often Direct).
+            if (string.Equals(normalized, "domain:youtube.com", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalized, "domain:www.youtube.com", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.Equals(normalized, "domain:www.youtube.com", StringComparison.OrdinalIgnoreCase)
+                    && !result.Contains("domain:youtube.com", StringComparer.OrdinalIgnoreCase))
+                    result.Add("domain:youtube.com");
+
+                foreach (var related in new[]
+                {
+                    "domain:youtu.be",
+                    "domain:googlevideo.com",
+                    "domain:ytimg.com",
+                    "domain:youtubei.googleapis.com",
+                    "domain:youtube.googleapis.com",
+                    "domain:youtube-nocookie.com",
+                    "domain:ggpht.com"
+                })
+                {
+                    if (!result.Contains(related, StringComparer.OrdinalIgnoreCase))
+                        result.Add(related);
+                }
+            }
+        }
+        return result;
     }
 
     private static JsonObject NormalizeImportedJson(string rawJson, AppSettings settings, bool tunnelMode)
