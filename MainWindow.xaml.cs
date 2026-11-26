@@ -109,6 +109,7 @@ public partial class MainWindow : Window
         foreach (var rule in _settings.RoutingRules ?? [])
             if (!string.IsNullOrWhiteSpace(rule.Domain)) _routingRules.Add(rule); // never keep empty rules
         RoutingRulesGrid.ItemsSource = _routingRules;
+        InitializeAppRouting();
         _core = new XrayCoreService(_store);
         _core.LogReceived += AddCoreLog;
         _core.RunningChanged += Core_RunningChanged;
@@ -354,6 +355,7 @@ public partial class MainWindow : Window
             validRoutingRules.Add(rule);
         }
         _settings.RoutingRules = validRoutingRules;
+        SyncAppRoutingRulesToSettings();
         _settings.DefaultRoute = DefaultRouteCombo.SelectedValue?.ToString() ?? "proxy";
         var wantedModeIndex = _settings.Mode.Contains("Туннель", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
         if (ModeCombo.SelectedIndex != wantedModeIndex) ModeCombo.SelectedIndex = wantedModeIndex;
@@ -1327,6 +1329,7 @@ public partial class MainWindow : Window
             }
 
             _settings.RoutingRules = _routingRules.ToList();
+            SyncAppRoutingRulesToSettings();
             _settings.DefaultRoute = DefaultRouteCombo.SelectedValue?.ToString() ?? "proxy";
             _store.SaveSettings(_settings);
             AddLog($"Маршрутизация сохранена. Пользовательских правил: {_routingRules.Count}.");
@@ -1974,6 +1977,16 @@ public partial class MainWindow : Window
 
     private static readonly Dictionary<string, string> RussianEnglish = new(StringComparer.Ordinal)
     {
+        ["Домены и IP"]="Domains & IPs", ["Маршрутизация приложений"]="App routing", ["Добавить приложение"]="Add application",
+        ["Приложение"]="Application", ["Действие"]="Action",
+        ["Выбери приложения и укажи, через какой выход отправлять их трафик. Эти правила приоритетнее правил для доменов."]="Choose applications and set where their traffic goes. These rules take priority over domain rules.",
+        ["Список пуст. Нажми «Добавить приложение», чтобы выбрать запущенное приложение или указать файл."]="The list is empty. Press “Add application” to pick a running app or choose a file.",
+        ["Приложение определяется по имени исполняемого файла. Правила сохраняются автоматически и применяются при следующем подключении."]="An application is matched by its executable name. Rules are saved automatically and apply on the next connection.",
+        ["Добавить выбранные"]="Add selected", ["Отмена"]="Cancel", ["Выбрать файл…"]="Choose file…", ["Выбери приложение"]="Choose application",
+        ["Приложения"]="Applications", ["Все файлы"]="All files", ["Поиск по названию или пути"]="Search by name or path",
+        ["Загрузка списка приложений…"]="Loading applications…", ["Ничего не найдено. Можно выбрать файл вручную."]="Nothing found. You can choose a file manually.",
+        ["Запущенных приложений"]="Running applications",
+        ["Выбери запущенные приложения из списка или укажи файл приложения вручную."]="Pick running applications from the list or choose an application file manually.",
         ["Ядро · Xray Core"]="Core · Xray Core",
         ["Главная"]="Home", ["Конфигурации"]="Configurations", ["Правила трафика"]="Traffic rules", ["Маршрутизация"]="Routing", ["Настройки"]="Settings", ["О программе"]="About", ["Добавить профиль"]="Add profile", ["Журнал"]="Logs",
         ["Управление подключением"]="Connection", ["Подключение к выбранному серверу и параметры режима работы."]="Connect to the selected server and configure the connection mode.", ["СОСТОЯНИЕ СОЕДИНЕНИЯ"]="CONNECTION STATUS", ["Отключено"]="Disconnected", ["Ядро не запущено"]="Core is not running", ["Подключить"]="Connect", ["Отключить"]="Disconnect", ["РЕЖИМ РАБОТЫ"]="CONNECTION MODE", ["Прокси"]="Proxy", ["Туннель (TUN)"]="Tunnel (TUN)", ["АКТИВНЫЙ ПРОФИЛЬ"]="ACTIVE PROFILE", ["Не выбран"]="Not selected", ["Выбрать конфигурацию"]="Select configuration", ["Добавить конфигурацию"]="Add configuration", ["Импортировать"]="Import", ["Загрузить файл"]="Load file", ["Обновить подписки"]="Update subscriptions", ["Мои конфигурации"]="My configurations", ["Удалить выбранную"]="Remove selected",
@@ -2160,7 +2173,7 @@ public partial class MainWindow : Window
         // inactive tabs, so a visual-only walk leaves those pages in the old language.
         // The visited set prevents processing templated elements twice.
         TranslateElementTree(this, map, new HashSet<DependencyObject>(ReferenceEqualityComparer.Instance));
-        foreach (var column in RoutingRulesGrid.Columns)
+        foreach (var column in RoutingRulesGrid.Columns.Concat(AppRoutingGrid.Columns))
             if (column.Header is string header && map.TryGetValue(header, out var translated)) column.Header = translated;
         UpdateNavigationState();
         UpdateTrayMenuLanguage();

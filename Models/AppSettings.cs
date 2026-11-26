@@ -58,4 +58,5 @@ public sealed class AppSettings
     // Traffic routing.
     public string DefaultRoute { get; set; } = "proxy";
     public List<RoutingRule> RoutingRules { get; set; } = [];
+    public List<AppRoutingRule> AppRoutingRules { get; set; } = [];
 }

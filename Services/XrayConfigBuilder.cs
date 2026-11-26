@@ -292,6 +292,25 @@ public static class XrayConfigBuilder
                 ["type"] = "field", ["network"] = "udp", ["port"] = "443", ["outboundTag"] = "blocked"
             });
 
+        // Per-application routes are more specific than domain routes, so they go first.
+        // Xray matches the originating process by its executable name (Windows: for example chrome.exe).
+        foreach (var app in settings.AppRoutingRules ?? [])
+        {
+            var processName = app.ProcessName;
+            if (string.IsNullOrWhiteSpace(processName)) continue;
+            newRules.Add(new JsonObject
+            {
+                ["type"] = "field",
+                ["process"] = new JsonArray(processName),
+                ["outboundTag"] = app.Action?.ToLowerInvariant() switch
+                {
+                    "direct" or "напрямую" => "direct",
+                    "block" or "blocked" or "блокировать" => "blocked",
+                    _ => defaultProxyTag
+                }
+            });
+        }
+
         foreach (var rule in settings.RoutingRules ?? [])
         {
             var domains = ExpandRoutingDomains(rule.Domain);
@@ -333,7 +352,7 @@ public static class XrayConfigBuilder
             var hasTarget = !string.IsNullOrWhiteSpace(rule["outboundTag"]?.ToString())
                 || !string.IsNullOrWhiteSpace(rule["balancerTag"]?.ToString());
             if (!hasTarget) continue;
-            var hasSpecificMatch = new[] { "domain", "ip", "port", "inboundTag", "protocol", "source" }
+            var hasSpecificMatch = new[] { "domain", "ip", "port", "inboundTag", "protocol", "source", "process" }
                 .Any(key => rule.ContainsKey(key));
             if (!hasSpecificMatch && (rule["network"] is null || rule["network"]?.ToString() is "tcp,udp" or "tcp, udp"))
                 rebuilt.RemoveAt(i);
