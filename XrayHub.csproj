@@ -10,7 +10,7 @@
     <AssemblyName>XrayHub</AssemblyName>
     <ApplicationIcon>Assets\XrayHub.ico</ApplicationIcon>
     <RootNamespace>XrayHub</RootNamespace>
-    <Version>0.3.16</Version>
+    <Version>0.3.18</Version>
     <Product>XrayHub</Product>
     <Description>Windows proxy and tunnel client built around Xray Core.</Description>
   </PropertyGroup>

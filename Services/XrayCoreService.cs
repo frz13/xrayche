@@ -10,6 +10,7 @@ public sealed class XrayCoreService : IAsyncDisposable
 {
     private readonly ProfileStore _store;
     private Process? _process;
+    private readonly WindowsProcessJob _processJob = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
     public event Action<string>? LogReceived;
     public event Action<bool>? RunningChanged;
@@ -73,6 +74,17 @@ public sealed class XrayCoreService : IAsyncDisposable
                     RunningChanged?.Invoke(false);
             };
             if (!process.Start()) throw new InvalidOperationException("Не удалось запустить xray.exe.");
+            try
+            {
+                // Windows kills all assigned processes when the last job handle closes,
+                // including when XrayHub crashes or is terminated from Task Manager.
+                _processJob.Assign(process);
+            }
+            catch
+            {
+                try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { }
+                throw;
+            }
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
             // Early-exit window: leave as soon as Xray reports it started (or died), otherwise after 900 ms.
@@ -345,5 +357,9 @@ public sealed class XrayCoreService : IAsyncDisposable
         return (process.ExitCode, output.Trim());
     }
 
-    public async ValueTask DisposeAsync() => await StopAsync();
+    public async ValueTask DisposeAsync()
+    {
+        try { await StopAsync(); }
+        finally { _processJob.Dispose(); }
+    }
 }
