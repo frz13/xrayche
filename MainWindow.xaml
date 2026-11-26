@@ -6,7 +6,7 @@
         Width="920" Height="650" MinWidth="760" MinHeight="520"
         WindowStartupLocation="CenterScreen" ResizeMode="CanResize" SizeChanged="MainWindow_SizeChanged"
         UseLayoutRounding="True" SnapsToDevicePixels="True"
-        Closing="Window_Closing" PreviewMouseWheel="MainWindow_PreviewMouseWheel" Background="{DynamicResource Bg}"
+        Closing="Window_Closing" PreviewMouseWheel="MainWindow_PreviewMouseWheel" PreviewMouseRightButtonDown="MainWindow_PreviewMouseRightButtonDown" Background="{DynamicResource Bg}"
         Foreground="{DynamicResource TextMain}" FontFamily="Segoe UI Variable, Segoe UI">
     <Window.Resources>
         <local:ScrollThumbViewportConverter x:Key="ScrollThumbViewportConverter" />
@@ -67,6 +67,9 @@
         </Style>
 
         <Style TargetType="ScrollBar">
+            <!-- Scrollbars have no useful context menu; suppress the blank native popup. -->
+            <Setter Property="ContextMenuService.IsEnabled" Value="False" />
+            <Setter Property="ContextMenu" Value="{x:Null}" />
             <Setter Property="Width" Value="9" />
             <Setter Property="MinWidth" Value="9" />
             <Setter Property="Background" Value="Transparent" />
@@ -827,7 +830,6 @@
                                             </Border>
                                         </Grid>
                                     </Border>
-                                    <TextBlock Text="System и Mixed доступны в Sing-box/Mihomo, но не являются параметрами TUN-конфигурации Xray Core. Не показываем неработающий переключатель: выбор других стеков появится после добавления отдельного TUN-движка." FontSize="10" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,6,0,10"/>
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <StackPanel Margin="0,0,7,0"><TextBlock Text="Размер сетевого пакета (MTU)" FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,4"/><ComboBox x:Name="TunMtuCombo" SelectedValuePath="Tag"><ComboBoxItem Content="1500" Tag="1500"/><ComboBoxItem Content="1492" Tag="1492"/><ComboBoxItem Content="1380" Tag="1380"/><ComboBoxItem Content="1200" Tag="1200"/></ComboBox></StackPanel>
