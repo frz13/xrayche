@@ -1189,7 +1189,24 @@ public partial class MainWindow : Window
         _routingRules.Add(rule);
         RoutingRulesGrid.SelectedItem = rule;
         RoutingRulesGrid.ScrollIntoView(rule);
-        RoutingRulesGrid.BeginEdit();
+        RoutingRulesGrid.CurrentCell = new DataGridCellInfo(rule, RoutingRulesGrid.Columns[0]);
+
+        // Start editing the domain cell immediately and place the caret in its TextBox.
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            RoutingRulesGrid.Focus();
+            RoutingRulesGrid.BeginEdit();
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                var row = RoutingRulesGrid.ItemContainerGenerator.ContainerFromItem(rule) as DataGridRow;
+                if (row is null) return;
+                var cell = FindVisualChild<DataGridCell>(row);
+                var editor = cell is null ? null : FindVisualChild<TextBox>(cell);
+                if (editor is null) return;
+                editor.Focus();
+                editor.CaretIndex = editor.Text.Length;
+            }), DispatcherPriority.Input);
+        }), DispatcherPriority.Input);
     }
 
     private void RemoveRoutingRule_Click(object sender, RoutedEventArgs e)
@@ -1222,11 +1239,16 @@ public partial class MainWindow : Window
         {
             RoutingRulesGrid.CommitEdit(DataGridEditingUnit.Cell, true);
             RoutingRulesGrid.CommitEdit(DataGridEditingUnit.Row, true);
+            // Empty rows are unfinished drafts, not routing rules: discard them on save.
+            var emptyRules = _routingRules
+                .Where(rule => SplitRuleText(rule.Domain ?? string.Empty).Count == 0)
+                .ToList();
+            foreach (var emptyRule in emptyRules)
+                _routingRules.Remove(emptyRule);
+
             foreach (var rule in _routingRules)
             {
-                var domains = SplitRuleText(rule.Domain);
-                if (domains.Count == 0)
-                    throw new FormatException("В каждом правиле укажи хотя бы один домен или удали пустую строку.");
+                var domains = SplitRuleText(rule.Domain ?? string.Empty);
                 foreach (var domain in domains)
                 {
                     if (!IsValidDomainRule(domain))
