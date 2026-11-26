@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.Net.NetworkInformation;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using XrayHub.Models;
 
 namespace XrayHub.Services;
@@ -40,6 +42,10 @@ public sealed class XrayCoreService : IAsyncDisposable
             if (test.ExitCode != 0)
                 throw new InvalidOperationException("Xray отклонил конфигурацию:\n" + test.Output);
 
+            // TUN only: remove an orphaned xray.exe / stale adapter left by a crashed earlier run.
+            if (tunnelMode)
+                await PrepareTunAsync(settings.XrayPath, GetTunName(config), cancellationToken);
+
             var start = new ProcessStartInfo
             {
                 FileName = settings.XrayPath,
@@ -56,8 +62,9 @@ public sealed class XrayCoreService : IAsyncDisposable
 
             var process = new Process { StartInfo = start, EnableRaisingEvents = true };
             _process = process;
-            process.OutputDataReceived += (_, e) => { if (!string.IsNullOrWhiteSpace(e.Data)) LogReceived?.Invoke(e.Data); };
-            process.ErrorDataReceived += (_, e) => { if (!string.IsNullOrWhiteSpace(e.Data)) LogReceived?.Invoke(e.Data); };
+            var startedSignal = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            process.OutputDataReceived += (_, e) => HandleCoreLine(e.Data, startedSignal);
+            process.ErrorDataReceived += (_, e) => HandleCoreLine(e.Data, startedSignal);
             process.Exited += (_, _) =>
             {
                 try { LogReceived?.Invoke($"Процесс Xray завершился. Код выхода: {process.ExitCode}."); }
@@ -72,13 +79,171 @@ public sealed class XrayCoreService : IAsyncDisposable
             if (process.HasExited)
             {
                 var code = process.ExitCode;
+                if (tunnelMode) _tunDirty = true;
                 await StopInternalAsync();
                 throw new InvalidOperationException($"Xray завершился при запуске (код {code}). Проверь лог ядра.");
             }
+
+            // In TUN mode the SOCKS inbound answers long before the Windows adapter is actually
+            // created. Xray can still die ~10-15 s later with "Failed to setup adapter" (0xB7).
+            // Do not report success until Xray itself says it started (or the adapter is really up).
+            if (tunnelMode)
+            {
+                LogReceived?.Invoke("Ожидание создания TUN-адаптера…");
+                var tunName = GetTunName(config);
+                var tunIp = settings.TunAddress.Split('/')[0];
+                var deadline = DateTime.UtcNow + TunReadyTimeout;
+                var ready = false;
+                while (DateTime.UtcNow < deadline)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (process.HasExited) break;
+                    if (startedSignal.Task.IsCompleted || IsTunAdapterUp(tunName, tunIp)) { ready = true; break; }
+                    await Task.Delay(250, cancellationToken);
+                }
+
+                if (!ready)
+                {
+                    var exited = process.HasExited;
+                    var exitCode = exited ? process.ExitCode : 0;
+                    _tunDirty = true;
+                    await StopInternalAsync();
+                    throw new InvalidOperationException(exited
+                        ? $"Xray завершился при запуске (код {exitCode}): не удалось создать TUN-адаптер. Проверь лог ядра."
+                        : $"Xray завершился при запуске: TUN-адаптер не создан за {(int)TunReadyTimeout.TotalSeconds} с.");
+                }
+            }
+
             RunningChanged?.Invoke(true);
             LogReceived?.Invoke($"Xray запущен. Режим: {(tunnelMode ? "TUN" : "Прокси")}");
         }
         finally { _gate.Release(); }
+    }
+
+    private static readonly TimeSpan TunReadyTimeout = TimeSpan.FromSeconds(30);
+
+    private void HandleCoreLine(string? line, TaskCompletionSource<bool> startedSignal)
+    {
+        if (string.IsNullOrWhiteSpace(line)) return;
+        LogReceived?.Invoke(line);
+        // Xray prints "[Warning] core: Xray <version> started" once every inbound (including TUN) is up.
+        if (line.Contains("core: Xray", StringComparison.Ordinal) && line.TrimEnd().EndsWith("started", StringComparison.Ordinal))
+            startedSignal.TrySetResult(true);
+    }
+
+    private static string GetTunName(JsonObject config)
+    {
+        try
+        {
+            if (config["inbounds"] is JsonArray inbounds)
+            {
+                foreach (var inbound in inbounds.OfType<JsonObject>())
+                {
+                    if (!string.Equals(inbound["protocol"]?.GetValue<string>(), "tun", StringComparison.OrdinalIgnoreCase)) continue;
+                    var name = inbound["settings"]?["name"]?.GetValue<string>();
+                    if (!string.IsNullOrWhiteSpace(name)) return name;
+                }
+            }
+        }
+        catch { }
+        return "XrayHub";
+    }
+
+    private static bool IsTunAdapterUp(string name, string ipv4)
+    {
+        try
+        {
+            foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (!string.Equals(nic.Name, name, StringComparison.OrdinalIgnoreCase)) continue;
+                if (nic.OperationalStatus != OperationalStatus.Up) continue;
+                if (nic.GetIPProperties().UnicastAddresses.Any(a => a.Address.ToString() == ipv4)) return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    // True until a cleanup has run in this session, and again after any failed TUN start.
+    private bool _tunDirty = true;
+
+    private async Task PrepareTunAsync(string xrayPath, string tunName, CancellationToken token)
+    {
+        try
+        {
+            // 1) An orphaned xray.exe (from a crashed earlier XrayHub) keeps the adapter busy -> 0xB7.
+            var fullPath = Path.GetFullPath(xrayPath);
+            foreach (var other in Process.GetProcessesByName("xray"))
+            {
+                try
+                {
+                    using (other)
+                    {
+                        var path = other.MainModule?.FileName;
+                        if (path is not null && string.Equals(Path.GetFullPath(path), fullPath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            LogReceived?.Invoke($"Найден незавершённый xray.exe от прошлого запуска (PID {other.Id}); завершаю.");
+                            other.Kill(entireProcessTree: true);
+                            await other.WaitForExitAsync(token).WaitAsync(TimeSpan.FromSeconds(4), token);
+                        }
+                    }
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException) { }
+            }
+
+            // 2) A leftover adapter with our name. Only when it is visible, or after a failed start,
+            //    so the normal connect path does not pay for starting PowerShell.
+            var visible = NetworkInterface.GetAllNetworkInterfaces()
+                .Any(n => string.Equals(n.Name, tunName, StringComparison.OrdinalIgnoreCase));
+            if (!visible && !_tunDirty) return;
+            if (!IsSafeAdapterName(tunName)) return;
+
+            LogReceived?.Invoke("Очистка возможных остатков TUN-адаптера перед запуском…");
+            var script =
+                "$ErrorActionPreference='SilentlyContinue';" +
+                $"$a=@(Get-NetAdapter -Name '{tunName}' -IncludeHidden);" +
+                "foreach($x in $a){ if($x.PnPDeviceID){ pnputil /remove-device $x.PnPDeviceID | Out-Null } };" +
+                "if($a.Count -gt 0){ Start-Sleep -Milliseconds 800;" +
+                $" $b=@(Get-NetAdapter -Name '{tunName}' -IncludeHidden); if($b.Count -gt 0){ $b | Remove-NetAdapter -Confirm:$false } }";
+            await RunPowerShellAsync(script, TimeSpan.FromSeconds(12), token);
+            _tunDirty = false;
+            if (visible) await Task.Delay(1000, token);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Best effort: never block a connection because cleanup failed.
+            LogReceived?.Invoke("Очистка TUN-адаптера не выполнена: " + ex.Message);
+        }
+    }
+
+    private static bool IsSafeAdapterName(string name) =>
+        !string.IsNullOrWhiteSpace(name) && name.All(c => char.IsLetterOrDigit(c) || c is ' ' or '-' or '_' or '.');
+
+    private static async Task RunPowerShellAsync(string script, TimeSpan timeout, CancellationToken token)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        psi.ArgumentList.Add("-NoProfile");
+        psi.ArgumentList.Add("-NonInteractive");
+        psi.ArgumentList.Add("-ExecutionPolicy");
+        psi.ArgumentList.Add("Bypass");
+        psi.ArgumentList.Add("-Command");
+        psi.ArgumentList.Add(script);
+        using var process = Process.Start(psi);
+        if (process is null) return;
+        _ = process.StandardOutput.ReadToEndAsync();
+        _ = process.StandardError.ReadToEndAsync();
+        try { await process.WaitForExitAsync(token).WaitAsync(timeout, token); }
+        catch (TimeoutException)
+        {
+            try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { }
+        }
     }
 
     public async Task StopAsync()

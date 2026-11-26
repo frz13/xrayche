@@ -373,7 +373,7 @@ public partial class MainWindow : Window
             }
 
             ConnectButton.IsEnabled = false;
-            SetConnectionStatus("Запуск ядра…", connected: false);
+            SetConnectionStatus("Подключение…", connected: false);
             FooterText.Text = L("Проверка конфигурации Xray…");
             AddLog($"Подготовка подключения: {profile.DisplayName}");
             // A TUN startup can fail transiently while the Windows adapter is being
@@ -383,10 +383,12 @@ public partial class MainWindow : Window
             // Xray is still running: that would hide ordinary proxy/network failures.
             ConnectionInfo? egress = null;
             var xrayStarted = false;
-            for (var startupAttempt = 1; startupAttempt <= 2; startupAttempt++)
+            for (var startupAttempt = 1; startupAttempt <= 3; startupAttempt++)
             {
                 try
                 {
+                    xrayStarted = false;
+                    if (startupAttempt > 1) SetConnectionStatus($"Повторный запуск ({startupAttempt}/3)…", connected: false);
                     await _core.StartAsync(profile, _settings, tunnelMode);
                     xrayStarted = true;
 
@@ -413,11 +415,11 @@ public partial class MainWindow : Window
 
                     break;
                 }
-                catch (Exception startupError) when (tunnelMode && startupAttempt == 1
+                catch (Exception startupError) when (tunnelMode && startupAttempt < 3
                     && ((!_core.IsRunning && xrayStarted)
                         || startupError.Message.StartsWith("Xray завершился при запуске", StringComparison.Ordinal)))
                 {
-                    AddLog("Xray завершился во время запуска/проверки TUN. Выполняю одну повторную попытку после очистки процесса: " + startupError.Message);
+                    AddLog($"Xray завершился во время запуска/проверки TUN (попытка {startupAttempt}/3). Повтор после очистки процесса: " + startupError.Message);
                     await _core.StopAsync();
                     await Task.Delay(TimeSpan.FromSeconds(3));
                     AddLog("Повторный запуск TUN после ожидания освобождения адаптера.");
@@ -1910,7 +1912,7 @@ public partial class MainWindow : Window
         ["TUN перенаправляет системный трафик через виртуальный сетевой интерфейс. Для запуска требуются права администратора."]="TUN routes system traffic through a virtual network interface. Administrator privileges are required.",
         ["Прокси использует локальные SOCKS/HTTP-входы и, при включении, системные настройки Windows."]="Proxy uses local SOCKS/HTTP inbounds and, when enabled, Windows system proxy settings.",
         ["Туннель создаёт виртуальный сетевой интерфейс и направляет через Xray системный трафик."]="Tunnel mode creates a virtual network interface and routes system traffic through Xray.",
-        ["Запуск ядра…"]="Starting core…",
+        ["Подключение…"]="Connecting…",
         ["Проверка конфигурации Xray…"]="Checking Xray configuration…",
         ["Подключено"]="Connected",
         ["Ошибка подключения"]="Connection failed",
