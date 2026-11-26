@@ -35,7 +35,7 @@ public partial class MainWindow
             };
         }
         UpdateAppRoutingEmptyState();
-        SetRoutingSubTab("domains");
+        SetRoutingSubTab("domains", animate: false);
     }
 
     private void AppRule_PropertyChanged(object? sender, PropertyChangedEventArgs e) => ScheduleSettingsAutosave();
@@ -59,7 +59,7 @@ public partial class MainWindow
         if (sender is Button { Tag: string tag }) SetRoutingSubTab(tag);
     }
 
-    private void SetRoutingSubTab(string tag)
+    private void SetRoutingSubTab(string tag, bool animate = true)
     {
         if (RoutingDomainsPanel is null || RoutingAppsPanel is null) return;
         var apps = string.Equals(tag, "apps", StringComparison.Ordinal);
@@ -67,6 +67,7 @@ public partial class MainWindow
         RoutingAppsPanel.Visibility = apps ? Visibility.Visible : Visibility.Collapsed;
         MarkSubTab(RoutingSubDomainsButton, !apps);
         MarkSubTab(RoutingSubAppsButton, apps);
+        if (animate) PlayEntrance(apps ? RoutingAppsPanel : RoutingDomainsPanel, 10, 220);
     }
 
     private static void MarkSubTab(Button button, bool active)

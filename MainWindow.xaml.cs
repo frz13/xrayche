@@ -110,6 +110,7 @@ public partial class MainWindow : Window
             if (!string.IsNullOrWhiteSpace(rule.Domain)) _routingRules.Add(rule); // never keep empty rules
         RoutingRulesGrid.ItemsSource = _routingRules;
         InitializeAppRouting();
+        InitializeAnimations();
         _core = new XrayCoreService(_store);
         _core.LogReceived += AddCoreLog;
         _core.RunningChanged += Core_RunningChanged;
@@ -515,11 +516,13 @@ public partial class MainWindow : Window
     private void SetConnectionStatus(string russianText, bool connected)
     {
         if (StatusText is null || ConnectedStatusButton is null) return;
+        SetConnectionPulse(connected);
         if (connected)
         {
             StatusText.Visibility = Visibility.Collapsed;
             ConnectedStatusLabel.Text = L(russianText);
             ConnectedStatusButton.Visibility = Visibility.Visible;
+            PlayEntrance(ConnectedStatusButton, 6, 260);
         }
         else
         {
@@ -527,6 +530,7 @@ public partial class MainWindow : Window
             StatusText.Visibility = Visibility.Visible;
             StatusText.Text = L(russianText);
             StatusText.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "TextMain");
+            PlayEntrance(StatusText, 6, 260);
         }
     }
 
@@ -1637,6 +1641,7 @@ public partial class MainWindow : Window
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
+        PlayEntrance(Content as FrameworkElement, 0, 320);
         EnsureTrayIcon();
 
         // Watch only Windows' proxy-registry change notifications. This is event-driven;
@@ -2513,6 +2518,7 @@ public partial class MainWindow : Window
     {
         if (!ReferenceEquals(e.OriginalSource, PageTabs)) return;
         UpdateNavigationState();
+        if (!_initializing) PlayEntrance(PageTabs.SelectedContent as FrameworkElement, 12, 240);
     }
 
     private void UpdateNavigationState()
@@ -2691,7 +2697,7 @@ public partial class MainWindow : Window
         var english = _settings.Language == "en";
         _trayConnectItem.Text = _connected
             ? (english ? "Disconnect from current server" : "Отключиться от текущего сервера")
-            : (english ? "Connect to last server" : "Подключиться к последнему серверу");
+            : (english ? "Connect to current server" : "Подключиться к текущему серверу");
         _trayOpenItem.Text = english ? "Open XrayHub" : "Открыть XrayHub";
         _trayExitItem.Text = english ? "Exit" : "Выход";
     }
@@ -2703,7 +2709,7 @@ public partial class MainWindow : Window
         {
             _trayConnectItem.Text = _connected
                 ? (_settings.Language == "en" ? "Disconnect from current server" : "Отключиться от текущего сервера")
-                : (_settings.Language == "en" ? "Connect to last server" : "Подключиться к последнему серверу");
+                : (_settings.Language == "en" ? "Connect to current server" : "Подключиться к текущему серверу");
             _trayConnectItem.Enabled = _connected || _profiles.Count > 0;
         }
         _trayIcon.Text = _connected ? (L("XrayHub · Подключено")) : (L("XrayHub · Готово"));
@@ -2725,7 +2731,9 @@ public partial class MainWindow : Window
             await DisconnectAsync();
             return;
         }
-        var profile = _settings.LastProfileId.HasValue
+        // "Current server" = the one selected in the list; fall back to the last used, then the first.
+        var profile = ProfileList.SelectedItem as ProxyProfile;
+        profile ??= _settings.LastProfileId.HasValue
             ? _profiles.FirstOrDefault(p => p.Id == _settings.LastProfileId.Value)
             : null;
         profile ??= _profiles.FirstOrDefault();
