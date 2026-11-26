@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Net.Http;
@@ -53,6 +53,7 @@ public partial class MainWindow : Window
     private bool _initializing = true;
     private bool _isSavingSettings;
     private bool _routingRuleEditing;
+    private const int MinPingSpinnerMs = 1450;
     private int _probeFailures;
     private Guid? _activeProfileId;
     private bool _subscriptionRefreshRunning;
@@ -105,7 +106,8 @@ public partial class MainWindow : Window
         _settings.Mode = string.Equals(_settings.Mode, "Туннель (TUN)", StringComparison.OrdinalIgnoreCase)
             ? "Туннель (TUN)" : "Прокси";
         _routingRules.Clear();
-        foreach (var rule in _settings.RoutingRules ?? []) _routingRules.Add(rule);
+        foreach (var rule in _settings.RoutingRules ?? [])
+            if (!string.IsNullOrWhiteSpace(rule.Domain)) _routingRules.Add(rule); // never keep empty rules
         RoutingRulesGrid.ItemsSource = _routingRules;
         _core = new XrayCoreService(_store);
         _core.LogReceived += AddCoreLog;
@@ -137,6 +139,7 @@ public partial class MainWindow : Window
             if (_initializing || _closing || _shutdownInProgress) return;
             // Never touch the UI while the user is typing in the rules grid: retry later.
             if (_routingRuleEditing) { _settingsAutosaveTimer.Start(); return; }
+            RemoveEmptyRoutingRules();
             try
             {
                 var before = JsonSerializer.Serialize(_settings);
@@ -157,7 +160,11 @@ public partial class MainWindow : Window
         RoutingRulesGrid.CellEditEnding += (_, _) =>
         {
             _routingRuleEditing = false;
-            Dispatcher.BeginInvoke(new Action(ScheduleSettingsAutosave), DispatcherPriority.Background);
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                RemoveEmptyRoutingRules();
+                ScheduleSettingsAutosave();
+            }), DispatcherPriority.Background);
         };
 
         _elapsedTimer.Tick += (_, _) => UpdateElapsed();
@@ -209,6 +216,15 @@ public partial class MainWindow : Window
         }
 
         SocksPasswordBox.PasswordChanged += (_, _) => ScheduleSettingsAutosave();
+    }
+
+    /// <summary>Empty rows are unfinished drafts, not rules: remove them unless one is being typed right now.</summary>
+    private void RemoveEmptyRoutingRules()
+    {
+        if (_routingRuleEditing) return;
+        for (var i = _routingRules.Count - 1; i >= 0; i--)
+            if (string.IsNullOrWhiteSpace(_routingRules[i].Domain))
+                _routingRules.RemoveAt(i);
     }
 
     private void ScheduleSettingsAutosave()
@@ -349,7 +365,10 @@ public partial class MainWindow : Window
         // Re-applying the palette / translating the whole tree resets focus and cancels
         // DataGrid editing, so do it only when theme or language really changed.
         if (!string.Equals(prevTheme, _settings.Theme, StringComparison.Ordinal))
+        {
             ApplyThemePalette();
+            UpdateNavigationState();
+        }
         if (!string.Equals(prevLanguage, _settings.Language, StringComparison.Ordinal))
         {
             ApplyUiLanguage();
@@ -455,11 +474,11 @@ public partial class MainWindow : Window
             _connectedAt = DateTimeOffset.Now;
             _probeFailures = 0;
             SetConnectionStatus("Подключено", connected: true);
-            ConnectionDot.Fill = (System.Windows.Media.Brush)FindResource("Accent");
+            ConnectionDot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "Accent");
             ConnectButton.Content = L("Отключить");
-            ConnectButton.Background = (System.Windows.Media.Brush)FindResource("Panel2");
-            ConnectButton.BorderBrush = (System.Windows.Media.Brush)FindResource("Line");
-            ConnectButton.Foreground = (System.Windows.Media.Brush)FindResource("TextMain");
+            ConnectButton.SetResourceReference(System.Windows.Controls.Control.BackgroundProperty, "Panel2");
+            ConnectButton.SetResourceReference(System.Windows.Controls.Control.BorderBrushProperty, "Line");
+            ConnectButton.SetResourceReference(System.Windows.Controls.Control.ForegroundProperty, "TextMain");
             CoreStatusText.Text = L(tunnelMode ? "Xray Core · TUN активен" : "Xray Core · локальный прокси активен");
             FooterText.Text = L(tunnelMode
                 ? "Подключено · TUN"
@@ -505,7 +524,7 @@ public partial class MainWindow : Window
             ConnectedStatusButton.Visibility = Visibility.Collapsed;
             StatusText.Visibility = Visibility.Visible;
             StatusText.Text = L(russianText);
-            StatusText.Foreground = (System.Windows.Media.Brush)FindResource("TextMain");
+            StatusText.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "TextMain");
         }
     }
 
@@ -554,11 +573,11 @@ public partial class MainWindow : Window
             {
                 // Do not tell the user that the VPN is disconnected while xray.exe is alive.
                 SetConnectionStatus("Отключение не завершено", connected: false);
-                ConnectionDot.Fill = (System.Windows.Media.Brush)FindResource("Accent");
+                ConnectionDot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "Accent");
                 ConnectButton.Content = L("Повторить отключение");
-                ConnectButton.Background = (System.Windows.Media.Brush)FindResource("Panel2");
-                ConnectButton.BorderBrush = (System.Windows.Media.Brush)FindResource("Line");
-                ConnectButton.Foreground = (System.Windows.Media.Brush)FindResource("TextMain");
+                ConnectButton.SetResourceReference(System.Windows.Controls.Control.BackgroundProperty, "Panel2");
+                ConnectButton.SetResourceReference(System.Windows.Controls.Control.BorderBrushProperty, "Line");
+                ConnectButton.SetResourceReference(System.Windows.Controls.Control.ForegroundProperty, "TextMain");
                 CoreStatusText.Text = L("Xray Core всё ещё работает");
                 FooterText.Text = L("Остановка не подтверждена · повтори отключение");
                 AddLog("Xray всё ещё работает. Состояние подключения сохранено; повторное нажатие попробует остановить ядро ещё раз.");
@@ -567,11 +586,11 @@ public partial class MainWindow : Window
             {
                 _activeProfileId = null;
                 SetConnectionStatus("Отключено", connected: false);
-                ConnectionDot.Fill = (System.Windows.Media.Brush)FindResource("TextMuted");
+                ConnectionDot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "TextMuted");
                 ElapsedText.Text = "00:00:00";
                 ConnectButton.Content = L("Подключить");
-                ConnectButton.Background = (System.Windows.Media.Brush)FindResource("Accent");
-                ConnectButton.BorderBrush = (System.Windows.Media.Brush)FindResource("Accent");
+                ConnectButton.SetResourceReference(System.Windows.Controls.Control.BackgroundProperty, "Accent");
+                ConnectButton.SetResourceReference(System.Windows.Controls.Control.BorderBrushProperty, "Accent");
                 ConnectButton.Foreground = System.Windows.Media.Brushes.White;
                 CoreStatusText.Text = L("Ядро не запущено");
                 FooterText.Text = L("Готово · Xray Core не запущен");
@@ -734,27 +753,26 @@ public partial class MainWindow : Window
             // Adapter enumeration is slow on Windows; do it once, off the UI thread.
             var localAddress = await Task.Run(() => FindPhysicalLocalAddress());
             var profilesSnapshot = _profiles.ToList();
+            var spinnerClock = Stopwatch.StartNew();
             var results = await Task.WhenAll(profilesSnapshot.Select(async profile =>
             {
+                (string Display, long? Milliseconds, string Method) measured;
                 await limiter.WaitAsync();
-                try
-                {
-                    var measured = await Task.Run(() => MeasureServerLatencyAsync(profile, localAddress));
-                    // Continuation runs on the UI thread: stop this row's spinner right away.
-                    profile.PingDisplay = measured.Display;
-                    if (measured.Milliseconds.HasValue)
-                        AddLog($"Задержка {profile.DisplayName}: {measured.Display} ({measured.Method}).");
-                    else
-                        AddLog($"TCP-проверка не прошла: {profile.DisplayName}.");
-                    return (Profile: profile, Result: measured);
-                }
-                catch
-                {
-                    profile.PingDisplay = "~";
-                    (string Display, long? Milliseconds, string Method) failed = ("~", null, "unavailable");
-                    return (Profile: profile, Result: failed);
-                }
+                try { measured = await Task.Run(() => MeasureServerLatencyAsync(profile, localAddress)); }
+                catch { measured = ("~", null, "unavailable"); }
                 finally { limiter.Release(); }
+
+                // Let the spinner play at least two full turns before the result replaces it.
+                var remaining = MinPingSpinnerMs - (int)spinnerClock.ElapsedMilliseconds;
+                if (remaining > 0) await Task.Delay(remaining);
+
+                // Continuation runs on the UI thread: show this row's result.
+                profile.PingDisplay = measured.Display;
+                if (measured.Milliseconds.HasValue)
+                    AddLog($"Задержка {profile.DisplayName}: {measured.Display} ({measured.Method}).");
+                else
+                    AddLog($"TCP-проверка не прошла: {profile.DisplayName}.");
+                return (Profile: profile, Result: measured);
             }));
 
             // Let the spinners disappear and the layout settle before the notice appears.
@@ -2314,11 +2332,11 @@ public partial class MainWindow : Window
             try { await Task.Run(_systemProxy.Restore).WaitAsync(TimeSpan.FromSeconds(3)); }
             catch (Exception ex) { AddLog("Не удалось восстановить системный прокси после остановки ядра: " + ex.Message); }
             SetConnectionStatus("Соединение прервано", connected: false);
-            ConnectionDot.Fill = (System.Windows.Media.Brush)FindResource("TextMuted");
+            ConnectionDot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "TextMuted");
             CoreStatusText.Text = L("Xray Core остановлен");
             ConnectButton.Content = L("Подключить");
-            ConnectButton.Background = (System.Windows.Media.Brush)FindResource("Accent");
-            ConnectButton.BorderBrush = (System.Windows.Media.Brush)FindResource("Accent");
+            ConnectButton.SetResourceReference(System.Windows.Controls.Control.BackgroundProperty, "Accent");
+            ConnectButton.SetResourceReference(System.Windows.Controls.Control.BorderBrushProperty, "Accent");
             ConnectButton.Foreground = System.Windows.Media.Brushes.White;
             ElapsedText.Text = "00:00:00";
             FooterText.Text = L("Ядро остановлено");
@@ -2497,12 +2515,9 @@ public partial class MainWindow : Window
         for (var i = 0; i < buttons.Length; i++)
         {
             var active = (i < 5 && i == selected) || (i == 5 && selected == 6);
-            buttons[i].Background = active
-                ? (System.Windows.Media.Brush)FindResource("NavSelected")
-                : System.Windows.Media.Brushes.Transparent;
-            buttons[i].Foreground = active
-                ? (System.Windows.Media.Brush)FindResource("TextMain")
-                : (System.Windows.Media.Brush)FindResource("TextMuted");
+            if (active) buttons[i].SetResourceReference(System.Windows.Controls.Control.BackgroundProperty, "NavSelected");
+            else buttons[i].Background = System.Windows.Media.Brushes.Transparent;
+            buttons[i].SetResourceReference(System.Windows.Controls.Control.ForegroundProperty, active ? "TextMain" : "TextMuted");
         }
     }
 
