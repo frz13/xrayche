@@ -39,23 +39,6 @@ public sealed class ProxyProfile : INotifyPropertyChanged
     public string RawJson { get; set; } = "";
     public string SourceLink { get; set; } = "";
     public string SubscriptionUrl { get; set; } = "";
-    /// <summary>Subscription name from the provider (profile-title header), if it was sent.</summary>
-    public string SubscriptionTitle { get; set; } = "";
-
-    /// <summary>Group caption in the profile list: provider title, otherwise the subscription host.</summary>
-    [JsonIgnore]
-    public string SubscriptionGroup
-    {
-        get
-        {
-            if (string.IsNullOrWhiteSpace(SubscriptionUrl)) return "Отдельные конфигурации";
-            if (!string.IsNullOrWhiteSpace(SubscriptionTitle)) return SubscriptionTitle.Trim();
-            if (!Uri.TryCreate(SubscriptionUrl, UriKind.Absolute, out var uri)) return SubscriptionUrl;
-            var tail = SubscriptionUrl.TrimEnd('/');
-            tail = tail.Length > 4 ? tail[^4..] : tail;
-            return $"{uri.Host} · …{tail}";
-        }
-    }
     public DateTimeOffset? UpdatedAt { get; set; }
 
     /// <summary>Last measured ICMP Echo latency, or an unavailable marker when no reply is received.</summary>

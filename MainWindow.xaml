@@ -535,29 +535,8 @@
                         <Border x:Name="ProfilesImportCard" Grid.Row="1" Style="{StaticResource CardBorder}" Margin="0,0,0,10">
                             <StackPanel>
                                 <TextBlock Text="Добавить конфигурацию" FontSize="13" FontWeight="SemiBold" />
-                                <Grid x:Name="ImportTextBoxHost" Margin="0,9,0,8">
-                                    <TextBox x:Name="ImportTextBox" MinHeight="54" MaxHeight="74" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
-                                             ToolTip="vless://, vmess://, trojan://, ss:// или HTTPS-ссылка подписки" />
-                                    <TextBlock x:Name="ImportHintText" Text="Введите URL подписки" FontSize="12" IsHitTestVisible="False"
-                                               VerticalAlignment="Top" HorizontalAlignment="Left" Margin="12,10,12,0"
-                                               Foreground="{DynamicResource TextMuted}">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                <Style.Triggers>
-                                                    <MultiDataTrigger>
-                                                        <MultiDataTrigger.Conditions>
-                                                            <Condition Binding="{Binding ElementName=ImportTextBox, Path=Text.Length}" Value="0" />
-                                                            <Condition Binding="{Binding ElementName=ImportTextBox, Path=IsMouseOver}" Value="False" />
-                                                            <Condition Binding="{Binding ElementName=ImportTextBox, Path=IsKeyboardFocused}" Value="False" />
-                                                        </MultiDataTrigger.Conditions>
-                                                        <Setter Property="Visibility" Value="Visible" />
-                                                    </MultiDataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                </Grid>
+                                <TextBox x:Name="ImportTextBox" Margin="0,9,0,8" MinHeight="54" MaxHeight="74" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                                         ToolTip="vless://, vmess://, trojan://, ss:// или HTTPS-ссылка подписки" />
                                 <WrapPanel>
                                     <Button Content="Импортировать" Click="ImportText_Click" Background="{DynamicResource Accent}" BorderBrush="{DynamicResource Accent}" Margin="0,0,7,0" />
                                     <Button Content="Загрузить файл" Click="ImportFile_Click" Margin="0,0,7,0" />
@@ -591,20 +570,6 @@
                                             <Style TargetType="{x:Type ScrollBar}"
                                                    BasedOn="{StaticResource ProfileListScrollBarStyle}" />
                                         </ListBox.Resources>
-                                        <ListBox.GroupStyle>
-                                            <GroupStyle>
-                                                <GroupStyle.HeaderTemplate>
-                                                    <DataTemplate>
-                                                        <StackPanel Orientation="Horizontal" Margin="4,10,0,4">
-                                                            <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" MaxWidth="360"
-                                                                       Foreground="{DynamicResource TextMuted}" TextTrimming="CharacterEllipsis" />
-                                                            <TextBlock Text="{Binding ItemCount, StringFormat=' · {0}'}" FontSize="11"
-                                                                       Foreground="{DynamicResource TextMuted}" />
-                                                        </StackPanel>
-                                                    </DataTemplate>
-                                                </GroupStyle.HeaderTemplate>
-                                            </GroupStyle>
-                                        </ListBox.GroupStyle>
                                     </ListBox>
                                 </Grid>
                             </DockPanel>
