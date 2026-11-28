@@ -957,6 +957,37 @@ public partial class MainWindow : Window
         return (string.Empty, 0);
     }
 
+    private void RemoveSubscription_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string group } || string.IsNullOrWhiteSpace(group)) return;
+        var targets = _profiles
+            .Where(p => !string.IsNullOrWhiteSpace(p.SubscriptionUrl) && p.SubscriptionGroup == group)
+            .ToList();
+        if (targets.Count == 0) return;
+
+        if (_connected && _activeProfileId is Guid activeId && targets.Any(p => p.Id == activeId))
+        {
+            ShowNotice(L("Сначала отключись от профиля этой подписки."), "XrayHub", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var answer = System.Windows.MessageBox.Show(this,
+            string.Format(L("Удалить подписку «{0}» вместе со всеми её конфигурациями ({1})?"), group, targets.Count),
+            "XrayHub", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (answer != MessageBoxResult.Yes) return;
+
+        foreach (var profile in targets) _profiles.Remove(profile);
+        if (_settings.LastProfileId is Guid lastId && targets.Any(p => p.Id == lastId))
+            _settings.LastProfileId = null;
+        if (ProfileList.SelectedItem is null && _profiles.Count > 0) ProfileList.SelectedIndex = 0;
+
+        _store.SaveProfiles(_profiles);
+        _store.SaveSettings(_settings);
+        ConfigureSubscriptionTimer();
+        UpdateTrayState();
+        AddLog($"Подписка удалена: {group} — {targets.Count} профилей");
+    }
+
     private void RemoveProfile_Click(object sender, RoutedEventArgs e)
     {
         if (ProfileList.SelectedItem is not ProxyProfile selected) return;
@@ -2149,7 +2180,7 @@ public partial class MainWindow : Window
         ["Сначала импортируй хотя бы одну конфигурацию."]="Import at least one configuration first.",
         ["Не удалось определить внешний IP."]="Could not determine the public IP.",
         ["XrayHub — настольный клиент Windows для управления подключениями через Xray Core. Приложение позволяет хранить профили, настраивать DNS и маршруты, управлять локальными входами и проверять доступность сервисов."]="XrayHub is a Windows desktop client for managing connections through Xray Core. It stores profiles, configures DNS and routes, manages local inbounds and checks service availability.",
-        ["Введите URL подписки"]="Enter subscription URL", ["vless://, vmess://, trojan://, ss:// или HTTPS-ссылка подписки"]="vless://, vmess://, trojan://, ss:// or an HTTPS subscription URL",
+        ["Введите URL подписки"]="Enter subscription URL", ["Удалить подписку"]="Delete subscription", ["Сначала отключись от профиля этой подписки."]="Disconnect from a profile of this subscription first.", ["Удалить подписку «{0}» вместе со всеми её конфигурациями ({1})?"]="Delete subscription \"{0}\" with all its configurations ({1})?", ["vless://, vmess://, trojan://, ss:// или HTTPS-ссылка подписки"]="vless://, vmess://, trojan://, ss:// or an HTTPS subscription URL",
         ["Время ответа ICMP Echo от сервера."]="ICMP Echo reply time from the server.",
         ["Направление трафика: прокси, напрямую или блокировать."]="Choose whether traffic is proxied, sent directly or blocked.",
         ["Проверять YouTube и Google во время подключения"]="Check YouTube and Google while connected",

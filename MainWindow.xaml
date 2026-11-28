@@ -595,12 +595,31 @@
                                             <GroupStyle>
                                                 <GroupStyle.HeaderTemplate>
                                                     <DataTemplate>
-                                                        <StackPanel Orientation="Horizontal" Margin="4,10,0,4">
-                                                            <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" MaxWidth="360"
-                                                                       Foreground="{DynamicResource TextMuted}" TextTrimming="CharacterEllipsis" />
-                                                            <TextBlock Text="{Binding ItemCount, StringFormat=' · {0}'}" FontSize="11"
-                                                                       Foreground="{DynamicResource TextMuted}" />
-                                                        </StackPanel>
+                                                        <Grid Margin="4,10,0,4">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" MaxWidth="360"
+                                                                           Foreground="{DynamicResource TextMuted}" TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock Text="{Binding ItemCount, StringFormat=' · {0}'}" FontSize="11"
+                                                                           Foreground="{DynamicResource TextMuted}" />
+                                                            </StackPanel>
+                                                            <Button Grid.Column="1" Content="Удалить подписку" Tag="{Binding Name}" Click="RemoveSubscription_Click"
+                                                                    Padding="8,3" FontSize="10" Margin="8,0,6,0" VerticalAlignment="Center"
+                                                                    ToolTip="Удалить подписку вместе со всеми её конфигурациями">
+                                                                <Button.Style>
+                                                                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding Name}" Value="Отдельные конфигурации">
+                                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Button.Style>
+                                                            </Button>
+                                                        </Grid>
                                                     </DataTemplate>
                                                 </GroupStyle.HeaderTemplate>
                                             </GroupStyle>
