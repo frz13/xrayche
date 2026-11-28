@@ -1,0 +1,1080 @@
+<Window x:Class="XrayHub.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:XrayHub"
+        Title="" Icon="{x:Null}"
+        Width="920" Height="650" MinWidth="760" MinHeight="520"
+        WindowStartupLocation="CenterScreen" ResizeMode="CanResize" SizeChanged="MainWindow_SizeChanged"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        Closing="Window_Closing" PreviewMouseWheel="MainWindow_PreviewMouseWheel" PreviewMouseRightButtonDown="MainWindow_PreviewMouseRightButtonDown" Background="{DynamicResource Bg}"
+        Foreground="{DynamicResource TextMain}" FontFamily="Segoe UI Variable, Segoe UI">
+    <Window.Resources>
+        <local:ScrollThumbViewportConverter x:Key="ScrollThumbViewportConverter" />
+        <Style x:Key="NavButton" TargetType="Button" BasedOn="{StaticResource BaseButton}">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="13,10" />
+            <Setter Property="Margin" Value="0,2" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="NavBorder" Background="{TemplateBinding Background}" CornerRadius="8">
+                            <Grid>
+                                <Border x:Name="ActiveBar" Width="3" Background="{DynamicResource Accent}" HorizontalAlignment="Left" Opacity="0" CornerRadius="0,2,2,0" />
+                                <ContentPresenter Margin="14,0,8,0" HorizontalAlignment="Left" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="NavBorder" Property="Background" Value="{DynamicResource Panel2}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="NavBorder" Property="Background" Value="{DynamicResource PanelHover}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CardBorder" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource Panel}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="Padding" Value="16" />
+        </Style>
+
+        <Style x:Key="PageTabItem" TargetType="TabItem">
+            <Setter Property="Visibility" Value="Collapsed" />
+        </Style>
+        
+        <Style TargetType="Hyperlink">
+            <Setter Property="Foreground" Value="{DynamicResource TextMain}" />
+            <Setter Property="TextDecorations" Value="{x:Null}" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource AccentHover}" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style TargetType="ScrollBar">
+            <!-- Scrollbars have no useful context menu; suppress the blank native popup. -->
+            <Setter Property="ContextMenuService.IsEnabled" Value="False" />
+            <Setter Property="ContextMenu" Value="{x:Null}" />
+            <Setter Property="Width" Value="9" />
+            <Setter Property="MinWidth" Value="9" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Background="Transparent" SnapsToDevicePixels="True">
+                            <!-- Bind the complete ScrollBar range to Track. Without ViewportSize,
+                                 the thumb does not represent the visible/total content ratio. -->
+                            <Track x:Name="PART_Track"
+                                   Orientation="{TemplateBinding Orientation}"
+                                   IsDirectionReversed="True"
+                                   Minimum="{TemplateBinding Minimum}"
+                                   Maximum="{TemplateBinding Maximum}"
+                                   Value="{TemplateBinding Value}"
+
+                                   Focusable="False">
+                            <Track.ViewportSize>
+                                <MultiBinding Converter="{StaticResource ScrollThumbViewportConverter}" ConverterParameter="24">
+                                    <Binding Path="ViewportSize" RelativeSource="{RelativeSource TemplatedParent}" />
+                                    <Binding Path="Maximum" RelativeSource="{RelativeSource TemplatedParent}" />
+                                    <Binding Path="Minimum" RelativeSource="{RelativeSource TemplatedParent}" />
+                                    <Binding Path="ActualHeight" RelativeSource="{RelativeSource TemplatedParent}" />
+                                    <Binding Path="ActualWidth" RelativeSource="{RelativeSource TemplatedParent}" />
+                                    <Binding Path="Orientation" RelativeSource="{RelativeSource TemplatedParent}" />
+                                </MultiBinding>
+                            </Track.ViewportSize>
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}"
+                                                  Opacity="0" IsTabStop="False" Focusable="False" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb x:Name="PART_Thumb" MinHeight="24" MinWidth="0">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border x:Name="ThumbBorder" Background="#68717D"
+                                                        CornerRadius="4" Margin="1" />
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="ThumbBorder" Property="Background" Value="#87919E" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsDragging" Value="True">
+                                                        <Setter TargetName="ThumbBorder" Property="Background" Value="#A0A9B4" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}"
+                                                  Opacity="0" IsTabStop="False" Focusable="False" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Orientation" Value="Horizontal">
+                                <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False" />
+                                <Setter TargetName="PART_Thumb" Property="MinHeight" Value="0" />
+                                <Setter TargetName="PART_Thumb" Property="MinWidth" Value="24" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Horizontal">
+                    <Setter Property="Width" Value="Auto" />
+                    <Setter Property="MinWidth" Value="0" />
+                    <Setter Property="Height" Value="8" />
+                    <Setter Property="MinHeight" Value="8" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <!-- Profile list gets a larger minimum thumb. Other page scrollbars retain the shared style. -->
+        <Style x:Key="ProfileListScrollBarStyle" TargetType="ScrollBar" BasedOn="{StaticResource {x:Type ScrollBar}}">
+            <Setter Property="Width" Value="10" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Background="Transparent" SnapsToDevicePixels="True">
+                            <Track x:Name="PART_Track"
+                                   Orientation="{TemplateBinding Orientation}"
+                                   IsDirectionReversed="True"
+                                   Minimum="{TemplateBinding Minimum}"
+                                   Maximum="{TemplateBinding Maximum}"
+                                   Value="{TemplateBinding Value}"
+
+                                   Focusable="False">
+                            <Track.ViewportSize>
+                                <MultiBinding Converter="{StaticResource ScrollThumbViewportConverter}" ConverterParameter="52">
+                                    <Binding Path="ViewportSize" RelativeSource="{RelativeSource TemplatedParent}" />
+                                    <Binding Path="Maximum" RelativeSource="{RelativeSource TemplatedParent}" />
+                                    <Binding Path="Minimum" RelativeSource="{RelativeSource TemplatedParent}" />
+                                    <Binding Path="ActualHeight" RelativeSource="{RelativeSource TemplatedParent}" />
+                                    <Binding Path="ActualWidth" RelativeSource="{RelativeSource TemplatedParent}" />
+                                    <Binding Path="Orientation" RelativeSource="{RelativeSource TemplatedParent}" />
+                                </MultiBinding>
+                            </Track.ViewportSize>
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}"
+                                                  Opacity="0" IsTabStop="False" Focusable="False" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb x:Name="PART_Thumb" MinHeight="52" MinWidth="0">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border x:Name="ThumbBorder" Background="#68717D"
+                                                        CornerRadius="4" Margin="1" />
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="ThumbBorder" Property="Background" Value="#87919E" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsDragging" Value="True">
+                                                        <Setter TargetName="ThumbBorder" Property="Background" Value="#A0A9B4" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}"
+                                                  Opacity="0" IsTabStop="False" Focusable="False" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Orientation" Value="Horizontal">
+                                <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False" />
+                                <Setter TargetName="PART_Thumb" Property="MinHeight" Value="0" />
+                                <Setter TargetName="PART_Thumb" Property="MinWidth" Value="24" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ScrollViewer">
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="PanningMode" Value="VerticalOnly" />
+        </Style>
+        <Style TargetType="DataGrid">
+            <Setter Property="Foreground" Value="{DynamicResource TextMain}" />
+            <Setter Property="Background" Value="{DynamicResource Panel}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+            <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource Line}" />
+            <Setter Property="VerticalGridLinesBrush" Value="{DynamicResource Line}" />
+            <Setter Property="RowBackground" Value="{DynamicResource Panel}" />
+            <Setter Property="AlternatingRowBackground" Value="{DynamicResource GridAltRow}" />
+            <Setter Property="HeadersVisibility" Value="Column" />
+            <Setter Property="CanUserResizeRows" Value="False" />
+            <Setter Property="CanUserReorderColumns" Value="False" />
+        </Style>
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+            <Setter Property="Background" Value="{DynamicResource GridHeader}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+            <Setter Property="BorderThickness" Value="0,0,1,1" />
+            <Setter Property="Padding" Value="8,7" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style TargetType="DataGridRow">
+            <Setter Property="Foreground" Value="{DynamicResource TextMain}" />
+            <Setter Property="Background" Value="{DynamicResource Panel}" />
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+        </Style>
+        
+        
+        <Style x:Key="RoutingDomainTextBlockStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextMain}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="7,0" />
+        </Style>
+        <Style TargetType="DataGridCell">
+            <Setter Property="Foreground" Value="{DynamicResource TextMain}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="5,3" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        </Style>
+
+
+        <DataTemplate x:Key="ProfileTemplate">
+            <Grid MinHeight="39">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="34" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Border Width="24" Height="16" Background="{DynamicResource Panel2}" CornerRadius="2" VerticalAlignment="Center" HorizontalAlignment="Left">
+                    <Image Source="{Binding CountryFlagImageUrl}" Width="24" Height="16" Stretch="Fill" SnapsToDevicePixels="True" />
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding DisplayName}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="Ядро · Xray Core" FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+                    <Border Background="{DynamicResource Panel2}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="5" Padding="8,5" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding ProtocolDisplay}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource TextMain}" />
+                    </Border>
+                    <Grid MinWidth="14" Height="18" Margin="7,0,0,0" VerticalAlignment="Center"
+                          ToolTip="Время ответа ICMP Echo от сервера.">
+                        <TextBlock Text="{Binding PingDisplay}" FontSize="10" FontWeight="SemiBold"
+                                   VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding PingDisplay}" Value="~">
+                                            <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding PingDisplay}" Value="—">
+                                            <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding PingDisplay}" Value="…">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <Grid x:Name="PingSpinner" Width="14" Height="14" HorizontalAlignment="Center"
+                              VerticalAlignment="Center" IsHitTestVisible="False"
+                              RenderTransformOrigin="0.5,0.5">
+                            <Grid.Style>
+                                <Style TargetType="Grid">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding PingDisplay}" Value="…">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Grid.Style>
+                            <Grid.Triggers>
+                                <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                                    <BeginStoryboard>
+                                        <Storyboard RepeatBehavior="Forever">
+                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                             From="0" To="360" Duration="0:0:0.7" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </EventTrigger>
+                            </Grid.Triggers>
+                            <Grid.RenderTransform>
+                                <RotateTransform Angle="0" />
+                            </Grid.RenderTransform>
+                            <Ellipse Width="13" Height="13" Stroke="#334B86C5" StrokeThickness="2" />
+                            <Path Data="M 7,1 A 6,6 0 1 1 1,7" Width="14" Height="14"
+                                  StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                  Fill="Transparent">
+                                <Path.Stroke>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#FF2F70E5" Offset="0" />
+                                        <GradientStop Color="#FF55C7FF" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Path.Stroke>
+                            </Path>
+                        </Grid>
+                    </Grid>
+                    <Button Width="25" Height="25" Margin="6,0,0,0" Padding="0" Background="{DynamicResource Panel2}"
+                            BorderBrush="{DynamicResource Line}" BorderThickness="1" ToolTip="Информация о сервере"
+                            Click="ProfileInfo_Click">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="InfoBorder" Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="13">
+                                    <TextBlock Text="i" FontFamily="Georgia" FontStyle="Italic" FontWeight="Bold"
+                                               FontSize="14" Foreground="{DynamicResource TextMain}" HorizontalAlignment="Center"
+                                               VerticalAlignment="Center" Margin="0,-1,0,0" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="InfoBorder" Property="Background" Value="{DynamicResource PanelHover}" />
+                                        <Setter TargetName="InfoBorder" Property="BorderBrush" Value="{DynamicResource AccentHover}" />
+                                    </Trigger>
+                                    <Trigger Property="IsPressed" Value="True">
+                                        <Setter TargetName="InfoBorder" Property="Background" Value="{DynamicResource AccentSoft}" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+    </Window.Resources>
+
+    <Grid x:Name="RootLayoutGrid">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="SidebarColumn" Width="178" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Left navigation / wordmark -->
+        <Border x:Name="SidebarBorder" Grid.Column="0" Background="{DynamicResource Sidebar}" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,1,0">
+            <DockPanel x:Name="SidebarDockPanel" Margin="11,14,11,12">
+                <StackPanel DockPanel.Dock="Top">
+                    <Border Height="86" Background="{DynamicResource Sidebar}" CornerRadius="9" Margin="0,0,0,22">
+                        <Image Source="pack://application:,,,/Assets/XrayHub.png" Width="76" Height="76" Stretch="Uniform" />
+                    </Border>
+                    <Button x:Name="HomeNavButton" Style="{StaticResource NavButton}" Content="Главная" Click="GoHome_Click" />
+                    <Button x:Name="ProfilesNavButton" Style="{StaticResource NavButton}" Content="Конфигурации" Click="GoToProfiles_Click" />
+                    <Button x:Name="TrafficNavButton" Style="{StaticResource NavButton}" Content="Правила трафика" Click="GoToTraffic_Click" />
+                    <Button x:Name="RoutingNavButton" Style="{StaticResource NavButton}" Content="Маршрутизация" Click="GoToRouting_Click" />
+                    <Button x:Name="SettingsNavButton" Style="{StaticResource NavButton}" Content="Настройки" Click="GoToSettings_Click" />
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Bottom">
+                    <Border Height="1" Background="{DynamicResource Line}" Margin="5,0,5,9" />
+                    <Button x:Name="AboutNavButton" Style="{StaticResource NavButton}" Content="О программе" Click="About_Click" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Main area -->
+        <Grid x:Name="MainAreaGrid" Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="56" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="25" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" Background="{DynamicResource FooterBg}" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1">
+                <Grid x:Name="HeaderContentGrid" Margin="20,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="HeaderTitle" Text="Главная" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="HeaderAddProfileButton" Content="Добавить профиль" Click="GoToProfiles_Click" Background="{DynamicResource Accent}" BorderBrush="{DynamicResource Accent}" Padding="12,8" Margin="0,0,8,0" />
+                        <Button x:Name="HeaderLogsButton" Content="Журнал" Click="OpenLogs_Click" Padding="12,8" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border x:Name="InlineNoticeHost" Grid.Row="1" Visibility="Collapsed" Margin="12,8,12,0"
+                    Padding="10,8" Background="{DynamicResource Panel2}" BorderBrush="{DynamicResource Accent}"
+                    BorderThickness="1" CornerRadius="8">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <TextBlock x:Name="InlineNoticeText" Text="" FontSize="11" TextWrapping="Wrap"
+                               VerticalAlignment="Center" Foreground="{DynamicResource TextMain}" />
+                    <Button Grid.Column="1" Content="×" Click="DismissNotice_Click" Width="24" Height="24"
+                            Padding="0" Margin="10,0,0,0" Background="Transparent" BorderThickness="0"
+                            Foreground="{DynamicResource TextMuted}" FontSize="16" />
+                </Grid>
+            </Border>
+
+            <TabControl x:Name="PageTabs" Grid.Row="2" Background="Transparent" BorderThickness="0"
+                        ItemContainerStyle="{StaticResource PageTabItem}" SelectionChanged="PageTabs_SelectionChanged"
+                        HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+                <!-- HOME -->
+                <TabItem>
+                    <ScrollViewer x:Name="HomePageScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="20,17,20,18">
+                            <TextBlock Text="Управление подключением" FontSize="18" FontWeight="SemiBold" />
+                            <TextBlock Text="Подключение к выбранному серверу и параметры режима работы." FontSize="11" Foreground="{DynamicResource TextMuted}" Margin="0,4,0,13" />
+
+                            <Border Style="{StaticResource CardBorder}" Padding="18" Margin="0,0,0,11">
+                                <Grid MinHeight="104">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Ellipse x:Name="ConnectionDot" Width="7" Height="7" Fill="{DynamicResource TextMuted}" Margin="0,0,8,0" />
+                                            <TextBlock Text="СОСТОЯНИЕ СОЕДИНЕНИЯ" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource TextMuted}" />
+                                        </StackPanel>
+                                        <TextBlock x:Name="StatusText" Text="Отключено" FontSize="23" FontWeight="SemiBold" Margin="0,8,0,0" />
+                                        <Button x:Name="ConnectedStatusButton" Visibility="Collapsed" Click="ConnectedStatusButton_Click"
+                                                Background="Transparent" BorderThickness="0" Padding="0" HorizontalAlignment="Left"
+                                                HorizontalContentAlignment="Left" Margin="-4,5,0,0" Cursor="Hand">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock x:Name="ConnectedStatusLabel" Text="Подключено" FontSize="23" FontWeight="SemiBold" Foreground="{DynamicResource Accent}" />
+                                                <TextBlock Text="  ›" FontSize="23" FontWeight="SemiBold" Foreground="{DynamicResource Accent}" />
+                                            </StackPanel>
+                                        </Button>
+                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                            <TextBlock x:Name="ElapsedText" Text="00:00:00" FontSize="12" FontFamily="Consolas" Foreground="{DynamicResource TextMuted}" />
+                                            <TextBlock x:Name="CoreStatusText" Visibility="Collapsed" Text="Ядро не запущено" FontSize="11" Foreground="{DynamicResource TextMuted}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <Button x:Name="ConnectButton" Grid.Column="1" Content="Подключить" Click="ConnectButton_Click"
+                                            Width="148" Height="43" VerticalAlignment="Center" Background="{DynamicResource Accent}"
+                                            BorderBrush="{DynamicResource Accent}" Foreground="White" FontSize="13" FontWeight="SemiBold" />
+                                </Grid>
+                            </Border>
+
+                            <Grid x:Name="HomeModeProfileGrid" Margin="0,0,0,11">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource CardBorder}" Margin="0,0,5,0" Padding="14">
+                                    <StackPanel>
+                                        <TextBlock Text="РЕЖИМ РАБОТЫ" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource TextMuted}" />
+                                        <ComboBox x:Name="ModeCombo" SelectionChanged="ModeCombo_SelectionChanged" Margin="0,9,0,0">
+                                            <ComboBoxItem Content="Прокси" />
+                                            <ComboBoxItem Content="Туннель (TUN)" />
+                                        </ComboBox>
+                                        <TextBlock x:Name="ModeDescription" Text="Прокси перенаправляет трафик через локальный вход и системные настройки Windows."
+                                                   TextWrapping="Wrap" Foreground="{DynamicResource TextMuted}" FontSize="10" Margin="0,8,0,0" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="1" Style="{StaticResource CardBorder}" Margin="5,0,0,0" Padding="14">
+                                    <StackPanel>
+                                        <TextBlock Text="АКТИВНЫЙ ПРОФИЛЬ" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource TextMuted}" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,11,0,0" VerticalAlignment="Center">
+                                            <Border Width="24" Height="16" Background="{DynamicResource Panel2}" CornerRadius="2" VerticalAlignment="Center">
+                                                <Image x:Name="SelectedProfileFlagImage" Width="24" Height="16" Stretch="Fill" />
+                                            </Border>
+                                            <TextBlock x:Name="SelectedProfileText" Text="Не выбран" FontSize="14" FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <Button Content="Выбрать конфигурацию" Click="GoToProfiles_Click" HorizontalAlignment="Left"
+                                                Margin="0,8,0,0" Padding="10,6" FontSize="10" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <Grid x:Name="HomeQuickLinksGrid">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource CardBorder}" Margin="0,0,5,0" Padding="14">
+                                    <StackPanel>
+                                        <TextBlock Text="Правила трафика" FontSize="12" FontWeight="SemiBold" />
+                                        <TextBlock Text="DNS, защита от утечек и сетевые проверки." FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,5,0,9" />
+                                        <Button Content="Открыть" Click="GoToTraffic_Click" HorizontalAlignment="Left" Padding="10,6" FontSize="10" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="1" Style="{StaticResource CardBorder}" Margin="5,0,0,0" Padding="14">
+                                    <StackPanel>
+                                        <TextBlock Text="Маршрутизация" FontSize="12" FontWeight="SemiBold" />
+                                        <TextBlock Text="Направление трафика: прокси, напрямую или блокировать." FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,5,0,9" />
+                                        <Button Content="Открыть" Click="GoToRouting_Click" HorizontalAlignment="Left" Padding="10,6" FontSize="10" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- PROFILES -->
+                <TabItem>
+                    <Grid x:Name="ProfilesPageRoot" Margin="20,18,20,18">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock x:Name="ProfilesDescriptionText" Grid.Row="0" Text="Импортируйте сервер или подписку. Поддерживаются VLESS, VMess, Trojan, Shadowsocks и Xray JSON." FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,10" />
+                        <Border x:Name="ProfilesImportCard" Grid.Row="1" Style="{StaticResource CardBorder}" Margin="0,0,0,10">
+                            <StackPanel>
+                                <TextBlock Text="Добавить конфигурацию" FontSize="13" FontWeight="SemiBold" />
+                                <Grid x:Name="ImportTextBoxHost" Margin="0,9,0,8">
+                                    <TextBox x:Name="ImportTextBox" MinHeight="54" MaxHeight="74" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                                             ToolTip="vless://, vmess://, trojan://, ss:// или HTTPS-ссылка подписки" />
+                                    <TextBlock x:Name="ImportHintText" Text="Введите URL подписки" FontSize="12" IsHitTestVisible="False"
+                                               VerticalAlignment="Top" HorizontalAlignment="Left" Margin="12,10,12,0"
+                                               Foreground="{DynamicResource TextMuted}">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding ElementName=ImportTextBox, Path=Text.Length}" Value="0" />
+                                                            <Condition Binding="{Binding ElementName=ImportTextBox, Path=IsMouseOver}" Value="False" />
+                                                            <Condition Binding="{Binding ElementName=ImportTextBox, Path=IsKeyboardFocused}" Value="False" />
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </MultiDataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                                <WrapPanel>
+                                    <Button Content="Импортировать" Click="ImportText_Click" Background="{DynamicResource Accent}" BorderBrush="{DynamicResource Accent}" Margin="0,0,7,0" />
+                                    <Button Content="Загрузить файл" Click="ImportFile_Click" Margin="0,0,7,0" />
+                                    <Button Content="Обновить подписки" Click="RefreshSubscriptions_Click" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                        <Border x:Name="ProfileListCard" Grid.Row="2" Style="{StaticResource CardBorder}" MinHeight="0" Padding="12">
+                            <DockPanel LastChildFill="True" MinHeight="0">
+                                <StackPanel x:Name="ProfileListHeader" DockPanel.Dock="Top" Margin="0,0,0,8">
+                                    <TextBlock Text="Мои конфигурации" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" Margin="0,0,0,7" />
+                                    <WrapPanel>
+                                        <Button x:Name="PingAllButton" Content="Пинг серверов" Click="PingAll_Click" Padding="10,6" FontSize="10" Margin="0,0,7,0" />
+                                        <Button Content="Удалить выбранную" Click="RemoveProfile_Click" Padding="10,6" FontSize="10" />
+                                    </WrapPanel>
+                                </StackPanel>
+                                <!-- Use one native ListBox scrollbar, styled locally. A second external
+                                     ScrollBar used to sit beside it and created two visible thumbs. -->
+                                <Grid x:Name="ProfileListViewport" MinHeight="0" ClipToBounds="True">
+                                    <ListBox x:Name="ProfileList"
+                                             ItemTemplate="{StaticResource ProfileTemplate}"
+                                             SelectionChanged="ProfileList_SelectionChanged"
+                                             PreviewMouseWheel="ProfileList_PreviewMouseWheel"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                             ScrollViewer.CanContentScroll="False"
+                                             ScrollViewer.PanningMode="VerticalOnly"
+                                             VirtualizingPanel.IsVirtualizing="False"
+                                             MinHeight="0" VerticalAlignment="Stretch" Focusable="True">
+                                        <ListBox.Resources>
+                                            <Style TargetType="{x:Type ScrollBar}"
+                                                   BasedOn="{StaticResource ProfileListScrollBarStyle}" />
+                                        </ListBox.Resources>
+                                        <ListBox.GroupStyle>
+                                            <GroupStyle>
+                                                <GroupStyle.HeaderTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel Orientation="Horizontal" Margin="4,10,0,4">
+                                                            <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" MaxWidth="360"
+                                                                       Foreground="{DynamicResource TextMuted}" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{Binding ItemCount, StringFormat=' · {0}'}" FontSize="11"
+                                                                       Foreground="{DynamicResource TextMuted}" />
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </GroupStyle.HeaderTemplate>
+                                            </GroupStyle>
+                                        </ListBox.GroupStyle>
+                                    </ListBox>
+                                </Grid>
+                            </DockPanel>
+                        </Border>
+                    </Grid>
+                </TabItem>
+
+                <!-- TRAFFIC -->
+                <TabItem>
+                    <ScrollViewer x:Name="TrafficPageScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="20,18,20,18">
+                            <TextBlock Text="DNS, защита соединения и сетевые ограничения." FontSize="11" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,13" />
+
+                            <Border Style="{StaticResource CardBorder}" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="Защита трафика" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,10" />
+                                    <Grid Margin="0,0,0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Блокировать DNS-утечки в режиме TUN" VerticalAlignment="Center"/><ToggleButton x:Name="ProtectDnsLeaksCheckBox" Grid.Column="1" Style="{StaticResource GradientSwitch}" /></Grid>
+                                    <TextBlock Text="Использует Windows Filtering Platform Xray для блокировки обходных DNS-запросов." FontSize="10" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,4,0,10" />
+                                    <Grid Margin="0,0,0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Локальные сети направлять напрямую" VerticalAlignment="Center"/><ToggleButton x:Name="BypassPrivateNetworksTrafficCheckBox" Grid.Column="1" Style="{StaticResource GradientSwitch}" /></Grid>
+                                    <TextBlock Text="Частные IP-диапазоны (geoip:private) не отправляются на удалённый сервер." FontSize="10" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,4,0,10" />
+                                    <Grid Margin="0,0,0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Блокировать QUIC (UDP/443) в режиме TUN" VerticalAlignment="Center"/><ToggleButton x:Name="DisableQuicTrafficCheckBox" Grid.Column="1" Style="{StaticResource GradientSwitch}" /></Grid>
+                                    <TextBlock Text="Браузеры обычно переключаются с HTTP/3 на TCP/HTTPS. Влияет только на UDP-порт 443." FontSize="10" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource CardBorder}" Margin="0,0,0,10" Visibility="Collapsed">
+                                <StackPanel>
+                                    <TextBlock Text="Проверка доступности" FontSize="13" FontWeight="SemiBold" />
+                                    <Grid Margin="0,8,0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Проверять YouTube и Google во время подключения" VerticalAlignment="Center"/><ToggleButton x:Name="YoutubeProbeTrafficCheckBox" Grid.Column="1" Style="{StaticResource GradientSwitch}" /></Grid>
+                                    <TextBlock Text="Проверка выполняется через локальный HTTP-вход XrayHub." FontSize="10" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,4,0,9" />
+                                    <Button Content="Проверить сейчас" Click="ProbeNow_Click" HorizontalAlignment="Left" Padding="11,7" />
+                                </StackPanel>
+                            </Border>
+
+                            <Button Content="Сохранить правила трафика" Click="SaveTrafficSettings_Click" HorizontalAlignment="Left" Background="{DynamicResource Accent}" BorderBrush="{DynamicResource Accent}" />
+                            <TextBlock Text="Изменения DNS и маршрутов применяются при следующем подключении." FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,8,0,0" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- ROUTING -->
+                <TabItem>
+                    <ScrollViewer x:Name="RoutingPageScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <Grid Margin="20,18,20,18">
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                            <TextBlock x:Name="RoutingProxyNotice" Text="Пользовательские правила доступны только в режиме «Туннель»" Visibility="Collapsed" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,12" />
+                            <StackPanel x:Name="RoutingPageContent" Grid.Row="1">
+                            <TextBlock Text="Задай, через какой выход отправлять отдельные домены, IP-адреса и порты." FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,13" />
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <Button x:Name="RoutingSubDomainsButton" Tag="domains" Content="Домены и IP" Click="RoutingSubTab_Click" Padding="14,7" Margin="0,0,6,0" />
+                                <Button x:Name="RoutingSubAppsButton" Tag="apps" Content="Маршрутизация приложений" Click="RoutingSubTab_Click" Padding="14,7" />
+                            </StackPanel>
+                            <StackPanel x:Name="RoutingDomainsPanel">
+
+                            <Border Style="{StaticResource CardBorder}" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="Маршрут по умолчанию" FontSize="13" FontWeight="SemiBold" />
+                                    <TextBlock Text="Используется для трафика, который не совпал ни с одним правилом." FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,4,0,8" />
+                                    <ComboBox x:Name="DefaultRouteCombo" SelectedValuePath="Tag" HorizontalAlignment="Left" MinWidth="220">
+                                        <ComboBoxItem Content="Через прокси" Tag="proxy" />
+                                        <ComboBoxItem Content="Напрямую" Tag="direct" />
+                                        <ComboBoxItem Content="Блокировать" Tag="block" />
+                                    </ComboBox>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource CardBorder}">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="Пользовательские правила" FontSize="13" FontWeight="SemiBold" />
+                                            <TextBlock Text="Правила применяются сверху вниз. Более точные правила размещай выше." FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,4,0,0" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Button Content="Добавить" Click="AddRoutingRule_Click" Padding="10,6" Margin="0,0,6,0" />
+                                            <Button Content="Удалить" Click="RemoveRoutingRule_Click" Padding="10,6" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <DataGrid x:Name="RoutingRulesGrid" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                                              HeadersVisibility="Column" GridLinesVisibility="Horizontal" RowHeaderWidth="0"
+                                              Height="250" MinHeight="220" MaxHeight="360" Background="{DynamicResource InputBg}" BorderBrush="{DynamicResource Line}"
+                                              BorderThickness="1" AlternatingRowBackground="{DynamicResource Panel2}" CanUserSortColumns="False"
+                                              SelectionMode="Single" SelectionUnit="FullRow" FontSize="11"
+                                              ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                        <DataGrid.Columns>
+                                            <DataGridTemplateColumn Header="Домен" Width="2.2*">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding Domain}" Style="{StaticResource RoutingDomainTextBlockStyle}" />
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                                <DataGridTemplateColumn.CellEditingTemplate>
+                                                    <DataTemplate>
+                                                        <Border Background="{DynamicResource InputBg}" BorderBrush="{DynamicResource Accent}"
+                                                                BorderThickness="1" CornerRadius="5" Margin="2,1" Padding="3,0">
+                                                            <TextBox Text="{Binding Domain, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                     Background="Transparent" Foreground="{DynamicResource TextMain}"
+                                                                     BorderThickness="0" Padding="5,3" FontSize="11"
+                                                                     CaretBrush="{DynamicResource Accent}" SelectionBrush="{DynamicResource InputSelection}"
+                                                                     FocusVisualStyle="{x:Null}" VerticalContentAlignment="Center" />
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellEditingTemplate>
+                                            </DataGridTemplateColumn>
+                                            <DataGridTemplateColumn Header="Действие" Width="1.0*">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding ActionLabel}" VerticalAlignment="Center" Margin="7,0" />
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                                <DataGridTemplateColumn.CellEditingTemplate>
+                                                    <DataTemplate>
+                                                        <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding Action, UpdateSourceTrigger=PropertyChanged}" MinWidth="92">
+                                                            <ComboBoxItem Content="Прокси" Tag="proxy" />
+                                                            <ComboBoxItem Content="Напрямую" Tag="direct" />
+                                                            <ComboBoxItem Content="Блокировать" Tag="block" />
+                                                        </ComboBox>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellEditingTemplate>
+                                            </DataGridTemplateColumn>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <Button Content="Выше" Click="MoveRoutingRuleUp_Click" Padding="10,6" Margin="0,0,6,0" />
+                                        <Button Content="Ниже" Click="MoveRoutingRuleDown_Click" Padding="10,6" />
+                                    </StackPanel>
+                                    <TextBlock Text="Введи корректное доменное имя, например google.com или sub.example.org, затем выбери действие. Несколько доменов можно разделить запятыми." FontSize="10" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,9,0,0" />
+                                </StackPanel>
+                            </Border>
+                            <TextBlock Text="Правила сохраняются автоматически после изменения и применяются при следующем подключении." FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="2,9,2,0" />
+                            </StackPanel>
+                            <StackPanel x:Name="RoutingAppsPanel" Visibility="Collapsed">
+                                <Border Style="{StaticResource CardBorder}">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="Маршрутизация приложений" FontSize="13" FontWeight="SemiBold" />
+                                                <TextBlock Text="Выбери приложения и укажи, через какой выход отправлять их трафик. Эти правила приоритетнее правил для доменов." FontSize="10" TextWrapping="Wrap" Margin="0,3,12,0" Foreground="{DynamicResource TextMuted}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Button Content="Добавить приложение" Click="AddAppRouting_Click" Padding="10,6" Margin="0,0,6,0" />
+                                                <Button Content="Удалить" Click="RemoveAppRouting_Click" Padding="10,6" />
+                                            </StackPanel>
+                                        </Grid>
+                                        <DataGrid x:Name="AppRoutingGrid" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                                                  IsReadOnly="True" HeadersVisibility="Column" GridLinesVisibility="Horizontal" RowHeaderWidth="0"
+                                                  Height="260" Background="{DynamicResource InputBg}" BorderBrush="{DynamicResource Line}"
+                                                  BorderThickness="1" AlternatingRowBackground="{DynamicResource Panel2}" CanUserSortColumns="False"
+                                                  SelectionMode="Extended" SelectionUnit="FullRow" FontSize="11"
+                                                  ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                            <DataGrid.Columns>
+                                                <DataGridTemplateColumn Header="Приложение" Width="2.4*">
+                                                    <DataGridTemplateColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <StackPanel Margin="7,4" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock Text="{Binding Path=Path}" FontSize="9" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"
+                                                                           ToolTip="{Binding Path=Path}" Foreground="{DynamicResource TextMuted}" />
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </DataGridTemplateColumn.CellTemplate>
+                                                </DataGridTemplateColumn>
+                                                <DataGridTemplateColumn Header="Действие" Width="1.1*">
+                                                    <DataGridTemplateColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding Action, UpdateSourceTrigger=PropertyChanged}" MinWidth="92" Margin="4,3" VerticalAlignment="Center">
+                                                                <ComboBoxItem Content="Прокси" Tag="proxy" />
+                                                                <ComboBoxItem Content="Напрямую" Tag="direct" />
+                                                                <ComboBoxItem Content="Блокировать" Tag="block" />
+                                                            </ComboBox>
+                                                        </DataTemplate>
+                                                    </DataGridTemplateColumn.CellTemplate>
+                                                </DataGridTemplateColumn>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                        <TextBlock x:Name="AppRoutingEmptyText" Text="Список пуст. Нажми «Добавить приложение», чтобы выбрать запущенное приложение или указать файл." FontSize="10" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{DynamicResource TextMuted}" />
+                                        <TextBlock Text="Приложение определяется по имени исполняемого файла. Правила сохраняются автоматически и применяются при следующем подключении." FontSize="10" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{DynamicResource TextMuted}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                            </StackPanel>
+                        </Grid>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- SETTINGS -->
+                <TabItem>
+                    <ScrollViewer x:Name="SettingsPageScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="20,18,20,22">
+                            <TextBlock Text="Основные параметры подключения, приложения и Xray Core." FontSize="11" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,14" />
+
+                            <Border Style="{StaticResource CardBorder}" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="ПОДКЛЮЧЕНИЕ" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource Accent}" Margin="0,0,0,12" />
+                                    <TextBlock Text="Режим подключения" FontSize="11" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,5" />
+                                    <ComboBox x:Name="SettingsModeCombo" SelectedValuePath="Tag" HorizontalAlignment="Left" MinWidth="230" SelectionChanged="SettingsModeCombo_SelectionChanged">
+                                        <ComboBoxItem Content="Прокси" Tag="proxy" />
+                                        <ComboBoxItem Content="Туннель (TUN)" Tag="tun" />
+                                    </ComboBox>
+                                    <TextBlock Text="DNS-сервер" FontSize="11" FontWeight="SemiBold" Margin="0,13,0,5" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <TextBox x:Name="DnsServersTextBox" MinHeight="36" VerticalContentAlignment="Center" ToolTip="IP-адрес DNS-сервера, например 8.8.8.8" />
+                                        <Button x:Name="DnsEditButton" Grid.Column="1" Content="По умолчанию" Click="DnsEditButton_Click" Margin="8,0,0,0" Padding="14,7" ToolTip="Сбросить DNS на 8.8.8.8" />
+                                    </Grid>
+                                    <TextBlock Text="По умолчанию используется 8.8.8.8. При необходимости укажи другой IP-адрес DNS-сервера." FontSize="10" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,5,0,0" />
+                                    <Grid Margin="0,14,0,0">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <StackPanel Margin="0,0,7,0"><TextBlock Text="Порт SOCKS5" FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,4"/><TextBox x:Name="SocksPortTextBox" /></StackPanel>
+                                        <StackPanel Grid.Column="1" Margin="7,0,0,0"><TextBlock Text="Порт HTTP" FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,4"/><TextBox x:Name="HttpPortTextBox" /></StackPanel>
+                                    </Grid>
+                                    <Grid Margin="0,14,0,0">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="Использовать системный прокси Windows в режиме «Прокси»" FontSize="11" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,10,0"/>
+                                        <ToggleButton x:Name="UseSystemProxyCheckBox" Grid.Column="1" Style="{StaticResource GradientSwitch}" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource CardBorder}" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="SOCKS5 АВТОРИЗАЦИЯ" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource Accent}" Margin="0,0,0,10" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="Запрашивать логин и пароль при подключении к локальному SOCKS5" FontSize="11" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                        <ToggleButton x:Name="SocksAuthToggle" Grid.Column="1" Style="{StaticResource GradientSwitch}" Checked="SocksAuthToggle_Changed" Unchecked="SocksAuthToggle_Changed" />
+                                    </Grid>
+                                    <Grid x:Name="SocksAuthFields" Margin="0,11,0,0">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <StackPanel Margin="0,0,7,0"><TextBlock Text="Логин" FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,4"/><TextBox x:Name="SocksUsernameTextBox" /></StackPanel>
+                                        <StackPanel Grid.Column="1" Margin="7,0,0,0">
+                                            <TextBlock Text="Пароль" FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,4"/>
+                                            <Grid>
+                                                <PasswordBox x:Name="SocksPasswordBox" Background="{DynamicResource InputBg}" Foreground="{DynamicResource TextMain}" BorderBrush="{DynamicResource Line}" BorderThickness="1" Padding="10,8" PreviewMouseLeftButtonDown="SocksPasswordBox_PreviewMouseLeftButtonDown" ToolTip="Нажми, чтобы показать пароль" />
+                                                <TextBox x:Name="SocksPasswordVisibleTextBox" Visibility="Collapsed" Background="{DynamicResource InputBg}" Foreground="{DynamicResource TextMain}" BorderBrush="{DynamicResource Line}" BorderThickness="1" Padding="10,8" TextChanged="SocksPasswordVisibleTextBox_TextChanged" PreviewMouseLeftButtonDown="SocksPasswordVisibleTextBox_PreviewMouseLeftButtonDown" ToolTip="Нажми ещё раз, чтобы скрыть пароль" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </Grid>
+                                    <Button Content="Сгенерировать новые данные" Click="GenerateSocksCredentials_Click" HorizontalAlignment="Left" Margin="0,9,0,0" Padding="11,7" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource CardBorder}" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="TUN / СЕТЕВОЙ ИНТЕРФЕЙС" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource Accent}" Margin="0,0,0,10" />
+                                    <TextBlock Text="TCP/IP стек" FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,4"/>
+                                    <Border Background="{DynamicResource InsetBg}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="7" Padding="11,9">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="gVisor · встроенный стек Xray" FontSize="12" FontWeight="SemiBold"/>
+                                                <TextBlock Text="Используется текущим TUN-движком" FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,3,0,0"/>
+                                            </StackPanel>
+                                            <Border Grid.Column="1" Background="{DynamicResource AccentSoft}" CornerRadius="5" Padding="8,4" VerticalAlignment="Center" ToolTip="Текущая реализация TUN в Xray Core использует встроенный gVisor-стек">
+                                                <TextBlock Text="АКТИВЕН" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource Accent}"/>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <StackPanel Margin="0,0,7,0"><TextBlock Text="Размер сетевого пакета (MTU)" FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,4"/><ComboBox x:Name="TunMtuCombo" SelectedValuePath="Tag"><ComboBoxItem Content="1500" Tag="1500"/><ComboBoxItem Content="1492" Tag="1492"/><ComboBoxItem Content="1380" Tag="1380"/><ComboBoxItem Content="1200" Tag="1200"/></ComboBox></StackPanel>
+                                        <StackPanel Grid.Column="1" Margin="7,0,0,0"><TextBlock Text="Адрес сетевого интерфейса" FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,4"/><TextBox x:Name="TunAddressTextBox" IsReadOnly="True" IsTabStop="False" Focusable="False" Cursor="Arrow" /></StackPanel>
+                                    </Grid>
+                                    <TextBlock Text="Для запуска TUN требуются права администратора." FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,7,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource CardBorder}" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="ПРИЛОЖЕНИЕ" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource Accent}" Margin="0,0,0,8" />
+                                    <Grid Margin="0,5"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Запускать приложение вместе с Windows" FontSize="11" VerticalAlignment="Center"/><ToggleButton x:Name="AutoStartAppToggle" Grid.Column="1" Style="{StaticResource GradientSwitch}"/></Grid>
+                                    <Grid Margin="0,5"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Запускать свёрнутым" FontSize="11" VerticalAlignment="Center"/><ToggleButton x:Name="AutoStartMinimizedToggle" Grid.Column="1" Style="{StaticResource GradientSwitch}" IsEnabled="{Binding IsChecked, ElementName=AutoStartAppToggle}"/></Grid>
+                                    <Grid Margin="0,5"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Автоматически подключаться к последнему серверу" FontSize="11" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,10,0"/><ToggleButton x:Name="AutoConnectToggle" Grid.Column="1" Style="{StaticResource GradientSwitch}"/></Grid>
+                                    <Grid Margin="0,5"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Сохранять положение и размер окна" FontSize="11" VerticalAlignment="Center"/><ToggleButton x:Name="SaveWindowPositionToggle" Grid.Column="1" Style="{StaticResource GradientSwitch}"/></Grid>
+                                    <Grid Margin="0,12,0,0">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <StackPanel Margin="0,0,7,0"><TextBlock Text="Тема" FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,4"/><ComboBox x:Name="ThemeCombo" SelectedValuePath="Tag" SelectionChanged="ThemeLanguage_SelectionChanged"><ComboBoxItem Content="Тёмная" Tag="dark"/><ComboBoxItem Content="Светлая" Tag="light"/></ComboBox></StackPanel>
+                                        <StackPanel Grid.Column="1" Margin="7,0,0,0"><TextBlock Text="Язык" FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,4"/><ComboBox x:Name="LanguageCombo" SelectedValuePath="Tag" SelectionChanged="ThemeLanguage_SelectionChanged"><ComboBoxItem Content="Русский" Tag="ru"/><ComboBoxItem Content="English" Tag="en"/></ComboBox></StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource CardBorder}" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="НАСТРОЙКИ ЯДРА XRAY" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource Accent}" Margin="0,0,0,8" />
+                                    <Grid Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Использовать мультиплексирование (Mux)" FontSize="11" VerticalAlignment="Center"/><ToggleButton x:Name="MuxEnabledToggle" Grid.Column="1" Style="{StaticResource GradientSwitch}"/></Grid>
+                                    <Grid Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <StackPanel Margin="0,0,7,0"><TextBlock Text="TCP соединения · от −1 до 1024" FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,4"/><TextBox x:Name="MuxTcpConcurrencyTextBox" IsEnabled="{Binding IsChecked, ElementName=MuxEnabledToggle}"/></StackPanel>
+                                        <StackPanel Grid.Column="1" Margin="7,0,0,0"><TextBlock Text="XUDP · от −1 до 1024" FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,4"/><TextBox x:Name="MuxXudpConcurrencyTextBox" IsEnabled="{Binding IsChecked, ElementName=MuxEnabledToggle}"/></StackPanel>
+                                    </Grid>
+                                    <TextBlock Text="Xray ограничивает TCP concurrency значением 128; XUDP поддерживает до 1024. Значение −1 отключает соответствующий режим." FontSize="10" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,5,0,8"/>
+                                    <TextBlock Text="Обработка QUIC (UDP/443) в Mux" FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,2,0,4"/>
+                                    <ComboBox x:Name="MuxQuicCombo" SelectedValuePath="Tag" HorizontalAlignment="Left" MinWidth="250" IsEnabled="{Binding IsChecked, ElementName=MuxEnabledToggle}">
+                                        <ComboBoxItem Content="Отклонять" Tag="reject"/><ComboBoxItem Content="Разрешать" Tag="allow"/><ComboBoxItem Content="Пропускать мимо Mux" Tag="skip"/>
+                                    </ComboBox>
+                                    <Grid Margin="0,13,0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Использовать фрагментирование" FontSize="11" VerticalAlignment="Center"/><ToggleButton x:Name="FragmentationToggle" Grid.Column="1" Style="{StaticResource GradientSwitch}"/></Grid>
+                                    <TextBlock Text="Фрагментирование TCP/TLS при установлении исходящего соединения." FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,4,0,6"/>
+                                    <TextBlock Text="Фрагментируемые пакеты" FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,0,0,4"/>
+                                    <ComboBox x:Name="FragmentPacketsCombo" SelectedValuePath="Tag" HorizontalAlignment="Left" MinWidth="250" IsEnabled="{Binding IsChecked, ElementName=FragmentationToggle}">
+                                        <ComboBoxItem Content="TLSHello" Tag="tlshello"/><ComboBoxItem Content="1–2" Tag="1-2"/><ComboBoxItem Content="1–3" Tag="1-3"/><ComboBoxItem Content="1–5" Tag="1-5"/>
+                                    </ComboBox>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource CardBorder}" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="АВТОМАТИЧЕСКОЕ ОБНОВЛЕНИЕ ПОДПИСОК" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource Accent}" Margin="0,0,0,8" />
+                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Обновлять подписки автоматически" FontSize="11" VerticalAlignment="Center"/><ToggleButton x:Name="AutoUpdateSubscriptionsToggle" Grid.Column="1" Style="{StaticResource GradientSwitch}"/></Grid>
+                                    <Grid Margin="0,8,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Интервал обновления" FontSize="10" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center"/><ComboBox x:Name="SubscriptionIntervalCombo" Grid.Column="1" SelectedValuePath="Tag" MinWidth="120" IsEnabled="{Binding IsChecked, ElementName=AutoUpdateSubscriptionsToggle}"><ComboBoxItem Content="1 час" Tag="1"/><ComboBoxItem Content="3 часа" Tag="3"/><ComboBoxItem Content="5 часов" Tag="5"/><ComboBoxItem Content="12 часов" Tag="12"/></ComboBox></Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock Text="Настройки сохраняются автоматически. Сетевые параметры применяются при следующем подключении." FontSize="10" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- LOGS -->
+                <TabItem>
+                    <Grid Margin="20,18,20,18">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <StackPanel Margin="0,0,0,10">
+                            <TextBlock Text="События приложения и вывод Xray Core." FontSize="11" Foreground="{DynamicResource TextMuted}" />
+                        </StackPanel>
+                        <TextBox x:Name="LogTextBox" Grid.Row="1" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                 Background="{DynamicResource InputBg}" FontFamily="Consolas" FontSize="10" />
+                        <Button Grid.Row="2" Content="Очистить журнал" Click="ClearLogs_Click" HorizontalAlignment="Left" Margin="0,9,0,0" />
+                    </Grid>
+                </TabItem>
+
+                <!-- ABOUT -->
+                <TabItem>
+                    <ScrollViewer x:Name="AboutPageScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="20,22,20,22" HorizontalAlignment="Center" MaxWidth="520">
+                            <Border Width="116" Height="116" Background="{DynamicResource Sidebar}" CornerRadius="18" Margin="0,8,0,18">
+                                <Image Source="pack://application:,,,/Assets/XrayHub.png" Stretch="Uniform" />
+                            </Border>
+                            <TextBlock Text="XrayHub" FontSize="25" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                            <TextBlock Text="Версия 0.3.15" FontSize="11" Foreground="{DynamicResource TextMuted}" HorizontalAlignment="Center" Margin="0,5,0,5" />
+                            <TextBlock FontSize="11" HorizontalAlignment="Center" Margin="0,0,0,18">
+                                <Run Text="created by: " />
+                                <Hyperlink NavigateUri="https://github.com/frz13" RequestNavigate="CreatorLink_RequestNavigate">frz</Hyperlink>
+                            </TextBlock>
+                            <Border Style="{StaticResource CardBorder}" Width="460" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="О программе" FontSize="13" FontWeight="SemiBold" />
+                                    <TextBlock Text="XrayHub — настольный клиент Windows для управления подключениями через Xray Core. Приложение позволяет хранить профили, настраивать DNS и маршруты, управлять локальными входами и проверять доступность сервисов." FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+            </TabControl>
+
+            <Border Grid.Row="3" Background="{DynamicResource FooterBg}" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0">
+                <Grid Margin="15,0">
+                    <TextBlock x:Name="FooterText" Visibility="Collapsed" Text="Готово · Xray Core не запущен" FontSize="9" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" />
+                    <TextBlock Text="XRAYHUB 0.3.15" FontSize="8" Foreground="{DynamicResource TextMuted}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Server details overlay: stays inside the main application window. -->
+        <Grid x:Name="ProfileDetailsOverlay" Grid.ColumnSpan="2" Panel.ZIndex="100"
+              Background="#B9000000" Visibility="Collapsed" MouseDown="ProfileDetailsOverlay_MouseDown">
+            <Border x:Name="ProfileDetailsCard" Width="650" MaxHeight="590" Background="{DynamicResource OverlayBg}" BorderBrush="{DynamicResource OverlayLine}"
+                    BorderThickness="1" CornerRadius="13" Padding="0" HorizontalAlignment="Center"
+                    VerticalAlignment="Center" Margin="24">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="1" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="1" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0" Margin="20,17,16,14">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Name="ProfileDetailsTitle" Text="Информация о сервере" FontSize="15" FontWeight="SemiBold" />
+                            <TextBlock x:Name="ProfileDetailsSubtitle" Text="Xray Core" FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="Закрыть" Click="CloseProfileInfo_Click" Padding="11,6" />
+                    </Grid>
+                    <Border Grid.Row="1" Background="{DynamicResource Line}" />
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="20,15,20,18">
+                        <StackPanel x:Name="ProfileDetailsContent" />
+                    </ScrollViewer>
+                    <Border Grid.Row="3" Background="{DynamicResource Line}" />
+                    <TextBlock Grid.Row="4" Text="Значения показаны из импортированной конфигурации; отсутствующие параметры скрыты."
+                               FontSize="9" Foreground="{DynamicResource TextMuted}" Margin="20,10,20,12" TextWrapping="Wrap" />
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Live connection details: in-app overlay, no separate dialog window. -->
+        <Grid x:Name="ConnectionDetailsOverlay" Grid.ColumnSpan="2" Panel.ZIndex="120"
+              Background="#B9000000" Visibility="Collapsed" MouseDown="ConnectionDetailsOverlay_MouseDown">
+            <Border x:Name="ConnectionDetailsCard" Panel.ZIndex="1" IsHitTestVisible="True" Width="590" MaxHeight="650" Background="{DynamicResource OverlayBg}" BorderBrush="{DynamicResource OverlayLine}"
+                    BorderThickness="1" CornerRadius="13" Padding="0" HorizontalAlignment="Center"
+                    VerticalAlignment="Center" Margin="24">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="1" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="1" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0" Margin="20,16,16,13">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Name="ConnectionDetailsTitle" Text="Данные текущего подключения" FontSize="15" FontWeight="SemiBold" />
+                            <TextBlock x:Name="ConnectionDetailsSubtitle" Text="Внешний адрес и геоданные активного соединения" FontSize="10" Foreground="{DynamicResource TextMuted}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <Button Grid.Column="1" IsHitTestVisible="True" IsEnabled="True" Content="Обновить" Click="RefreshConnectionDetails_Click" Padding="10,6" Margin="0,0,8,0" />
+                        <Button Grid.Column="2" IsHitTestVisible="True" IsEnabled="True" Content="Закрыть" Click="CloseConnectionDetails_Click" Padding="10,6" />
+                    </Grid>
+                    <Border Grid.Row="1" Background="{DynamicResource Line}" />
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="20,14,20,16">
+                        <StackPanel x:Name="ConnectionDetailsContent" />
+                    </ScrollViewer>
+                    <Border Grid.Row="3" Background="{DynamicResource Line}" />
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Persistent system-proxy conflict prompt. It is backed by a file in AppData,
+             so closing XrayHub without choosing an action does not discard the warning. -->
+        <Grid x:Name="ProxyConflictOverlay" Grid.ColumnSpan="2" Panel.ZIndex="140"
+              Background="#B9000000" Visibility="Collapsed">
+            <Border x:Name="ProxyConflictCard" Width="520" MaxHeight="390" Background="{DynamicResource OverlayBg}"
+                    BorderBrush="{DynamicResource OverlayLine}" BorderThickness="1"
+                    CornerRadius="13" Padding="22" HorizontalAlignment="Center"
+                    VerticalAlignment="Center" Margin="24">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,14">
+                        <Border Width="34" Height="34" CornerRadius="9" Background="{DynamicResource AccentSoft}"
+                                Margin="0,0,11,0" VerticalAlignment="Center">
+                            <TextBlock Text="!" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource Accent}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Обнаружен сторонний прокси" FontSize="16" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextMain}" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <TextBlock x:Name="ProxyConflictDescriptionText" TextWrapping="Wrap" FontSize="11"
+                               LineHeight="18" Foreground="{DynamicResource TextMain}" Margin="0,0,0,14" />
+                    <Border Background="{DynamicResource Panel2}" BorderBrush="{DynamicResource Line}"
+                            BorderThickness="1" CornerRadius="8" Padding="11" Margin="0,0,0,8">
+                        <TextBlock x:Name="ProxyConflictAddressText" TextWrapping="Wrap" FontSize="11"
+                                   Foreground="{DynamicResource TextMain}" />
+                    </Border>
+                    <TextBlock x:Name="ProxyConflictDetectedText" FontSize="9" Foreground="{DynamicResource TextMuted}"
+                               Margin="0,0,0,18" />
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <Button x:Name="LeaveProxyConflictButton" Content="Оставить как есть"
+                                Click="LeaveProxyConflict_Click" Padding="14,9" MinWidth="145"
+                                HorizontalAlignment="Left" />
+                        <Button x:Name="FixProxyConflictButton" Grid.Column="1" Content="Исправить"
+                                Click="FixProxyConflict_Click" Padding="18,9" MinWidth="120"
+                                Background="{DynamicResource Accent}" BorderBrush="{DynamicResource Accent}"
+                                Foreground="White" FontWeight="SemiBold" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

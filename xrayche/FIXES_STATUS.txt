@@ -1,0 +1,18 @@
+XrayHub source fixes — 25 November 2026
+
+Implemented in this archive:
+- TUN inbound sniffing is explicitly enabled for imported JSON profiles, so Xray can recover hostnames and match XrayHub domain routing rules.
+- Settings and routing rules are saved automatically after edits (debounced). Empty, unfinished routing rows are ignored until filled in. The manual Save buttons were removed.
+- Server latency checks use asynchronous TCP connection timing to the configured host:port with a 3-second timeout. This tests endpoint reachability; it is not an ICMP echo measurement.
+- The tray action switches between connecting to the last server and disconnecting from the current server.
+- Xray stop failures/timeouts are propagated instead of being treated as successful stops. The UI keeps an explicit “disconnect not completed” state if xray.exe is still running.
+- The initial egress verification has a bounded overall timeout and limited retries for a refused local SOCKS connection.
+- Xray process exit code is written to the log to help diagnose unexpected disconnects.
+
+Not established:
+- The reported disconnect after approximately 10 seconds could not be reproduced from the source archive alone. The Xray exit code and core output are now logged, but a runtime log from the affected machine is still needed to identify its cause.
+- TCP latency is not ICMP ping. It is a port-connect measurement and should be interpreted as such.
+
+Build status:
+- XAML was parsed successfully and the changed files passed basic structural checks.
+- A Windows/.NET build was not run because this environment has no .NET SDK, MSBuild, or C# compiler. Please build/test this source archive on Windows or through the repository's Windows GitHub Actions workflow.
