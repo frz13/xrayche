@@ -540,14 +540,19 @@
                                              ToolTip="vless://, vmess://, trojan://, ss:// или HTTPS-ссылка подписки" />
                                     <TextBlock x:Name="ImportHintText" Text="Введите URL подписки" FontSize="12" IsHitTestVisible="False"
                                                VerticalAlignment="Top" HorizontalAlignment="Left" Margin="12,10,12,0"
-                                               Foreground="{DynamicResource TextMuted}" Visibility="Collapsed">
+                                               Foreground="{DynamicResource TextMuted}">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
                                                 <Setter Property="Visibility" Value="Collapsed" />
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding ElementName=ImportTextBox, Path=Text.Length}" Value="0">
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding ElementName=ImportTextBox, Path=Text.Length}" Value="0" />
+                                                            <Condition Binding="{Binding ElementName=ImportTextBox, Path=IsMouseOver}" Value="False" />
+                                                            <Condition Binding="{Binding ElementName=ImportTextBox, Path=IsKeyboardFocused}" Value="False" />
+                                                        </MultiDataTrigger.Conditions>
                                                         <Setter Property="Visibility" Value="Visible" />
-                                                    </DataTrigger>
+                                                    </MultiDataTrigger>
                                                 </Style.Triggers>
                                             </Style>
                                         </TextBlock.Style>
@@ -586,6 +591,20 @@
                                             <Style TargetType="{x:Type ScrollBar}"
                                                    BasedOn="{StaticResource ProfileListScrollBarStyle}" />
                                         </ListBox.Resources>
+                                        <ListBox.GroupStyle>
+                                            <GroupStyle>
+                                                <GroupStyle.HeaderTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel Orientation="Horizontal" Margin="4,10,0,4">
+                                                            <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" MaxWidth="360"
+                                                                       Foreground="{DynamicResource TextMuted}" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{Binding ItemCount, StringFormat=' · {0}'}" FontSize="11"
+                                                                       Foreground="{DynamicResource TextMuted}" />
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </GroupStyle.HeaderTemplate>
+                                            </GroupStyle>
+                                        </ListBox.GroupStyle>
                                     </ListBox>
                                 </Grid>
                             </DockPanel>

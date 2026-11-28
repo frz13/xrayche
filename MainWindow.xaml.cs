@@ -117,6 +117,8 @@ public partial class MainWindow : Window
 
         foreach (var profile in _store.LoadProfiles()) _profiles.Add(profile);
         ProfileList.ItemsSource = _profiles;
+        System.Windows.Data.CollectionViewSource.GetDefaultView(_profiles).GroupDescriptions
+            .Add(new System.Windows.Data.PropertyGroupDescription(nameof(ProxyProfile.SubscriptionGroup)));
         var lastProfile = _settings.LastProfileId.HasValue
             ? _profiles.FirstOrDefault(p => p.Id == _settings.LastProfileId.Value)
             : null;
@@ -608,13 +610,28 @@ public partial class MainWindow : Window
         }
     }
 
+    private static string DecodeProfileTitle(string raw)
+    {
+        raw = raw.Trim();
+        if (raw.Length == 0) return "";
+        try
+        {
+            var text = raw.StartsWith("base64:", StringComparison.OrdinalIgnoreCase)
+                ? System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(raw[7..].Trim()))
+                : Uri.UnescapeDataString(raw);
+            text = text.Trim();
+            return text.Length > 60 ? text[..60] : text;
+        }
+        catch { return raw.Length > 60 ? raw[..60] : raw; }
+    }
+
     private static readonly HttpClient _subDirectHttp = new(new HttpClientHandler { UseProxy = false }) { Timeout = TimeSpan.FromSeconds(20) };
 
     /// <summary>
     /// Downloads a subscription. Many panels/CDNs answer 4xx/502 to requests without a client User-Agent,
     /// so we send one and retry with alternative identities and without the system proxy.
     /// </summary>
-    private async Task<string> FetchSubscriptionAsync(string url)
+    private async Task<(string Body, string Title)> FetchSubscriptionAsync(string url)
     {
         var attempts = new (HttpClient Client, string UserAgent)[]
         {
@@ -632,7 +649,13 @@ public partial class MainWindow : Window
                 request.Headers.UserAgent.ParseAdd(ua);
                 request.Headers.Accept.ParseAdd("*/*");
                 using var response = await client.SendAsync(request);
-                if (response.IsSuccessStatusCode) return await response.Content.ReadAsStringAsync();
+                if (response.IsSuccessStatusCode)
+                {
+                    var title = response.Headers.TryGetValues("profile-title", out var titles)
+                        ? DecodeProfileTitle(titles.FirstOrDefault() ?? "")
+                        : "";
+                    return (await response.Content.ReadAsStringAsync(), title);
+                }
                 last = new HttpRequestException($"HTTP {(int)response.StatusCode} ({response.StatusCode})");
                 AddLog($"Подписка {new Uri(url).Host}: {(int)response.StatusCode}, пробую другой вариант запроса");
             }
@@ -654,8 +677,9 @@ public partial class MainWindow : Window
             if (Uri.TryCreate(input, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https")
             {
                 AddLog("Загрузка подписки: " + uri.Host);
-                var body = await FetchSubscriptionAsync(uri.ToString());
+                var (body, title) = await FetchSubscriptionAsync(uri.ToString());
                 imported = ProfileParser.ParseSubscription(body, input);
+                foreach (var p in imported) p.SubscriptionTitle = title;
             }
             else imported = ProfileParser.ParseSubscription(input);
 
@@ -748,8 +772,11 @@ public partial class MainWindow : Window
             {
                 try
                 {
-                    var body = await FetchSubscriptionAsync(url);
+                    var (body, title) = await FetchSubscriptionAsync(url);
                     var updated = ProfileParser.ParseSubscription(body, url);
+                    if (string.IsNullOrWhiteSpace(title))
+                        title = _profiles.FirstOrDefault(p => string.Equals(p.SubscriptionUrl, url, StringComparison.OrdinalIgnoreCase))?.SubscriptionTitle ?? "";
+                    foreach (var p in updated) p.SubscriptionTitle = title;
                     foreach (var old in _profiles.Where(p => string.Equals(p.SubscriptionUrl, url, StringComparison.OrdinalIgnoreCase)).ToList())
                         _profiles.Remove(old);
                     foreach (var profile in updated) _profiles.Add(profile);
