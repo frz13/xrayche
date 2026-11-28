@@ -957,24 +957,61 @@ public partial class MainWindow : Window
         return (string.Empty, 0);
     }
 
+    private string? _pendingSubscriptionDelete;
+
+    private List<ProxyProfile> GetSubscriptionProfiles(string group) => _profiles
+        .Where(p => !string.IsNullOrWhiteSpace(p.SubscriptionUrl) && p.SubscriptionGroup == group)
+        .ToList();
+
+    private bool SubscriptionHasActiveProfile(IEnumerable<ProxyProfile> profiles) =>
+        _connected && _activeProfileId is Guid activeId && profiles.Any(p => p.Id == activeId);
+
     private void RemoveSubscription_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { Tag: string group } || string.IsNullOrWhiteSpace(group)) return;
-        var targets = _profiles
-            .Where(p => !string.IsNullOrWhiteSpace(p.SubscriptionUrl) && p.SubscriptionGroup == group)
-            .ToList();
+        var targets = GetSubscriptionProfiles(group);
         if (targets.Count == 0) return;
 
-        if (_connected && _activeProfileId is Guid activeId && targets.Any(p => p.Id == activeId))
+        if (SubscriptionHasActiveProfile(targets))
         {
             ShowNotice(L("Сначала отключись от профиля этой подписки."), "XrayHub", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
-        var answer = System.Windows.MessageBox.Show(this,
-            string.Format(L("Удалить подписку «{0}» вместе со всеми её конфигурациями ({1})?"), group, targets.Count),
-            "XrayHub", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (answer != MessageBoxResult.Yes) return;
+        _pendingSubscriptionDelete = group;
+        DeleteSubscriptionText.Text = string.Format(
+            L("Подписка «{0}» и все её конфигурации ({1}) будут удалены из списка. Это действие нельзя отменить."),
+            group, targets.Count);
+        DeleteSubscriptionOverlay.Visibility = Visibility.Visible;
+        ConfirmDeleteSubscriptionButton.Focus();
+    }
+
+    private void CancelDeleteSubscription_Click(object sender, RoutedEventArgs e)
+    {
+        _pendingSubscriptionDelete = null;
+        DeleteSubscriptionOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private void DeleteSubscriptionOverlay_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (ReferenceEquals(e.OriginalSource, DeleteSubscriptionOverlay))
+            CancelDeleteSubscription_Click(sender, e);
+    }
+
+    private void ConfirmDeleteSubscription_Click(object sender, RoutedEventArgs e)
+    {
+        var group = _pendingSubscriptionDelete;
+        _pendingSubscriptionDelete = null;
+        DeleteSubscriptionOverlay.Visibility = Visibility.Collapsed;
+        if (string.IsNullOrWhiteSpace(group)) return;
+
+        var targets = GetSubscriptionProfiles(group);
+        if (targets.Count == 0) return;
+        if (SubscriptionHasActiveProfile(targets))
+        {
+            ShowNotice(L("Сначала отключись от профиля этой подписки."), "XrayHub", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
 
         foreach (var profile in targets) _profiles.Remove(profile);
         if (_settings.LastProfileId is Guid lastId && targets.Any(p => p.Id == lastId))
@@ -2180,7 +2217,7 @@ public partial class MainWindow : Window
         ["Сначала импортируй хотя бы одну конфигурацию."]="Import at least one configuration first.",
         ["Не удалось определить внешний IP."]="Could not determine the public IP.",
         ["XrayHub — настольный клиент Windows для управления подключениями через Xray Core. Приложение позволяет хранить профили, настраивать DNS и маршруты, управлять локальными входами и проверять доступность сервисов."]="XrayHub is a Windows desktop client for managing connections through Xray Core. It stores profiles, configures DNS and routes, manages local inbounds and checks service availability.",
-        ["Введите URL подписки"]="Enter subscription URL", ["Удалить подписку"]="Delete subscription", ["Сначала отключись от профиля этой подписки."]="Disconnect from a profile of this subscription first.", ["Удалить подписку «{0}» вместе со всеми её конфигурациями ({1})?"]="Delete subscription \"{0}\" with all its configurations ({1})?", ["vless://, vmess://, trojan://, ss:// или HTTPS-ссылка подписки"]="vless://, vmess://, trojan://, ss:// or an HTTPS subscription URL",
+        ["Введите URL подписки"]="Enter subscription URL", ["Удалить подписку"]="Delete subscription", ["Сначала отключись от профиля этой подписки."]="Disconnect from a profile of this subscription first.", ["Удалить подписку?"]="Delete subscription?", ["Подписка «{0}» и все её конфигурации ({1}) будут удалены из списка. Это действие нельзя отменить."]="Subscription \"{0}\" and all its configurations ({1}) will be removed from the list. This cannot be undone.", ["vless://, vmess://, trojan://, ss:// или HTTPS-ссылка подписки"]="vless://, vmess://, trojan://, ss:// or an HTTPS subscription URL",
         ["Время ответа ICMP Echo от сервера."]="ICMP Echo reply time from the server.",
         ["Направление трафика: прокси, напрямую или блокировать."]="Choose whether traffic is proxied, sent directly or blocked.",
         ["Проверять YouTube и Google во время подключения"]="Check YouTube and Google while connected",

@@ -1095,5 +1095,36 @@
                 </StackPanel>
             </Border>
         </Grid>
+        <Grid x:Name="DeleteSubscriptionOverlay" Grid.ColumnSpan="2" Panel.ZIndex="150"
+              Background="#B9000000" Visibility="Collapsed" MouseDown="DeleteSubscriptionOverlay_MouseDown">
+            <Border Width="460" Background="{DynamicResource OverlayBg}"
+                    BorderBrush="{DynamicResource OverlayLine}" BorderThickness="1"
+                    CornerRadius="13" Padding="22" HorizontalAlignment="Center"
+                    VerticalAlignment="Center" Margin="24">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,14">
+                        <Border Width="34" Height="34" CornerRadius="9" Background="{DynamicResource AccentSoft}"
+                                Margin="0,0,11,0" VerticalAlignment="Center">
+                            <TextBlock Text="!" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource Accent}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Удалить подписку?" FontSize="16" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextMain}" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <TextBlock x:Name="DeleteSubscriptionText" TextWrapping="Wrap" FontSize="11" LineHeight="18"
+                               Foreground="{DynamicResource TextMain}" Margin="0,0,0,18" />
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <Button x:Name="CancelDeleteSubscriptionButton" Content="Отмена"
+                                Click="CancelDeleteSubscription_Click" Padding="14,9" MinWidth="120"
+                                HorizontalAlignment="Left" />
+                        <Button x:Name="ConfirmDeleteSubscriptionButton" Grid.Column="1" Content="Удалить"
+                                Click="ConfirmDeleteSubscription_Click" Padding="18,9" MinWidth="120"
+                                Background="{DynamicResource Accent}" BorderBrush="{DynamicResource Accent}"
+                                Foreground="White" FontWeight="SemiBold" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Window>
