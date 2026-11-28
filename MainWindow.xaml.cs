@@ -608,6 +608,42 @@ public partial class MainWindow : Window
         }
     }
 
+    private static readonly HttpClient _subDirectHttp = new(new HttpClientHandler { UseProxy = false }) { Timeout = TimeSpan.FromSeconds(20) };
+
+    /// <summary>
+    /// Downloads a subscription. Many panels/CDNs answer 4xx/502 to requests without a client User-Agent,
+    /// so we send one and retry with alternative identities and without the system proxy.
+    /// </summary>
+    private async Task<string> FetchSubscriptionAsync(string url)
+    {
+        var attempts = new (HttpClient Client, string UserAgent)[]
+        {
+            (_http, "XrayHub/0.3.19"),
+            (_http, "v2rayN/7.0"),
+            (_subDirectHttp, "v2rayN/7.0"),
+            (_subDirectHttp, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"),
+        };
+        Exception? last = null;
+        foreach (var (client, ua) in attempts)
+        {
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.UserAgent.ParseAdd(ua);
+                request.Headers.Accept.ParseAdd("*/*");
+                using var response = await client.SendAsync(request);
+                if (response.IsSuccessStatusCode) return await response.Content.ReadAsStringAsync();
+                last = new HttpRequestException($"HTTP {(int)response.StatusCode} ({response.StatusCode})");
+                AddLog($"Подписка {new Uri(url).Host}: {(int)response.StatusCode}, пробую другой вариант запроса");
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            {
+                last = ex;
+            }
+        }
+        throw last ?? new HttpRequestException("Не удалось загрузить подписку");
+    }
+
     private async void ImportText_Click(object sender, RoutedEventArgs e)
     {
         var input = ImportTextBox.Text.Trim();
@@ -618,7 +654,7 @@ public partial class MainWindow : Window
             if (Uri.TryCreate(input, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https")
             {
                 AddLog("Загрузка подписки: " + uri.Host);
-                var body = await _http.GetStringAsync(uri);
+                var body = await FetchSubscriptionAsync(uri.ToString());
                 imported = ProfileParser.ParseSubscription(body, input);
             }
             else imported = ProfileParser.ParseSubscription(input);
@@ -712,7 +748,7 @@ public partial class MainWindow : Window
             {
                 try
                 {
-                    var body = await _http.GetStringAsync(url);
+                    var body = await FetchSubscriptionAsync(url);
                     var updated = ProfileParser.ParseSubscription(body, url);
                     foreach (var old in _profiles.Where(p => string.Equals(p.SubscriptionUrl, url, StringComparison.OrdinalIgnoreCase)).ToList())
                         _profiles.Remove(old);
@@ -1563,7 +1599,7 @@ public partial class MainWindow : Window
         ProfilesImportCard.Margin = compactProfilesHeight ? new Thickness(0, 0, 0, 7) : new Thickness(0, 0, 0, 10);
         ImportTextBox.MinHeight = compactProfilesHeight ? 36 : 54;
         ImportTextBox.MaxHeight = compactProfilesHeight ? 42 : 74;
-        ImportTextBox.Margin = compactProfilesHeight ? new Thickness(0, 6, 0, 6) : new Thickness(0, 9, 0, 8);
+        ImportTextBoxHost.Margin = compactProfilesHeight ? new Thickness(0, 6, 0, 6) : new Thickness(0, 9, 0, 8);
         ProfileListCard.MinHeight = 0;
         ProfileListCard.Padding = compactProfilesHeight ? new Thickness(9) : new Thickness(12);
         ProfileListHeader.Margin = compactProfilesHeight ? new Thickness(0, 0, 0, 5) : new Thickness(0, 0, 0, 8);
@@ -2086,7 +2122,7 @@ public partial class MainWindow : Window
         ["Сначала импортируй хотя бы одну конфигурацию."]="Import at least one configuration first.",
         ["Не удалось определить внешний IP."]="Could not determine the public IP.",
         ["XrayHub — настольный клиент Windows для управления подключениями через Xray Core. Приложение позволяет хранить профили, настраивать DNS и маршруты, управлять локальными входами и проверять доступность сервисов."]="XrayHub is a Windows desktop client for managing connections through Xray Core. It stores profiles, configures DNS and routes, manages local inbounds and checks service availability.",
-        ["vless://, vmess://, trojan://, ss:// или HTTPS-ссылка подписки"]="vless://, vmess://, trojan://, ss:// or an HTTPS subscription URL",
+        ["Введите URL подписки"]="Enter subscription URL", ["vless://, vmess://, trojan://, ss:// или HTTPS-ссылка подписки"]="vless://, vmess://, trojan://, ss:// or an HTTPS subscription URL",
         ["Время ответа ICMP Echo от сервера."]="ICMP Echo reply time from the server.",
         ["Направление трафика: прокси, напрямую или блокировать."]="Choose whether traffic is proxied, sent directly or blocked.",
         ["Проверять YouTube и Google во время подключения"]="Check YouTube and Google while connected",
